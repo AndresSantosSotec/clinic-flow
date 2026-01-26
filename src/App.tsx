@@ -15,6 +15,10 @@ import PatientsList from "@/pages/patients/PatientsList";
 import PatientForm from "@/pages/patients/PatientForm";
 import AppointmentsList from "@/pages/appointments/AppointmentsList";
 import AppointmentForm from "@/pages/appointments/AppointmentForm";
+import DoctorsList from "@/pages/doctors/DoctorsList";
+import DoctorProfile from "@/pages/doctors/DoctorProfile";
+import PaymentsList from "@/pages/payments/PaymentsList";
+import RemindersList from "@/pages/reminders/RemindersList";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -45,12 +49,20 @@ const App = () => (
             <Route path="/appointments" element={<AppointmentsList />} />
             <Route path="/appointments/new" element={<AppointmentForm />} />
             
+            {/* Doctors */}
+            <Route path="/doctors" element={<DoctorsList />} />
+            <Route path="/doctors/:id" element={<DoctorProfile />} />
+            
+            {/* Payments */}
+            <Route path="/payments" element={<PaymentsList />} />
+            
+            {/* Reminders */}
+            <Route path="/reminders" element={<RemindersList />} />
+            
             {/* Placeholder routes */}
-            <Route path="/users" element={<div className="page-header"><h1 className="page-title">Usuarios</h1><p className="text-muted-foreground">Próximamente...</p></div>} />
+            <Route path="/users" element={<DoctorsList />} />
             <Route path="/encounters" element={<div className="page-header"><h1 className="page-title">Consultas</h1><p className="text-muted-foreground">Próximamente...</p></div>} />
-            <Route path="/payments" element={<div className="page-header"><h1 className="page-title">Cobros</h1><p className="text-muted-foreground">Próximamente...</p></div>} />
             <Route path="/reports" element={<div className="page-header"><h1 className="page-title">Reportes</h1><p className="text-muted-foreground">Próximamente...</p></div>} />
-            <Route path="/reminders" element={<div className="page-header"><h1 className="page-title">Recordatorios</h1><p className="text-muted-foreground">Próximamente...</p></div>} />
             <Route path="/settings" element={<div className="page-header"><h1 className="page-title">Configuración</h1><p className="text-muted-foreground">Próximamente...</p></div>} />
           </Route>
           
