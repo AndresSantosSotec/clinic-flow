@@ -28,6 +28,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ScheduleAppointmentDialog } from '@/components/patients/ScheduleAppointmentDialog';
 
 // Mock data
 const mockPatients = [
@@ -87,6 +88,8 @@ const mockPatients = [
 
 export default function PatientsList() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
+  const [selectedPatient, setSelectedPatient] = useState<typeof mockPatients[0] | null>(null);
 
   const filteredPatients = mockPatients.filter(
     (patient) =>
@@ -94,6 +97,11 @@ export default function PatientsList() {
       patient.phone.includes(searchQuery) ||
       patient.email?.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const handleScheduleAppointment = (patient: typeof mockPatients[0]) => {
+    setSelectedPatient(patient);
+    setScheduleDialogOpen(true);
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -108,7 +116,8 @@ export default function PatientsList() {
         <Button asChild className="gap-2">
           <Link to="/patients/new">
             <Plus className="h-4 w-4" />
-            Nuevo paciente
+            <span className="hidden sm:inline">Nuevo paciente</span>
+            <span className="sm:hidden">Nuevo</span>
           </Link>
         </Button>
       </div>
@@ -130,8 +139,8 @@ export default function PatientsList() {
         </Button>
       </div>
 
-      {/* Table */}
-      <div className="data-table-container">
+      {/* Table - Desktop */}
+      <div className="data-table-container hidden md:block">
         <Table>
           <TableHeader>
             <TableRow>
@@ -228,7 +237,9 @@ export default function PatientsList() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem>Ver perfil</DropdownMenuItem>
                         <DropdownMenuItem>Editar</DropdownMenuItem>
-                        <DropdownMenuItem>Agendar cita</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleScheduleAppointment(patient)}>
+                          Agendar cita
+                        </DropdownMenuItem>
                         <DropdownMenuItem>Ver historial</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -239,6 +250,108 @@ export default function PatientsList() {
           </TableBody>
         </Table>
       </div>
+
+      {/* Mobile Cards */}
+      <div className="md:hidden space-y-3">
+        {filteredPatients.map((patient) => {
+          const initials = `${patient.first_name[0]}${patient.last_name[0]}`;
+          return (
+            <div 
+              key={patient.id} 
+              className="p-4 rounded-lg border bg-card"
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-10 w-10">
+                    <AvatarFallback className="bg-primary/10 text-primary">
+                      {initials}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="font-medium">{patient.full_name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {patient.age} años • {patient.gender === 'M' ? 'M' : 'F'}
+                    </p>
+                  </div>
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem>Ver perfil</DropdownMenuItem>
+                    <DropdownMenuItem>Editar</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleScheduleAppointment(patient)}>
+                      Agendar cita
+                    </DropdownMenuItem>
+                    <DropdownMenuItem>Ver historial</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+              
+              <div className="mt-3 space-y-1.5 text-sm">
+                <div className="flex items-center gap-1.5">
+                  <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                  {patient.phone}
+                </div>
+                {patient.email && (
+                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                    <Mail className="h-3.5 w-3.5" />
+                    <span className="truncate">{patient.email}</span>
+                  </div>
+                )}
+              </div>
+
+              {patient.tags.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-1">
+                  {patient.tags.map((tag) => (
+                    <Badge
+                      key={tag.id}
+                      variant="outline"
+                      className="text-xs"
+                      style={{ 
+                        backgroundColor: `${tag.color}15`,
+                        borderColor: `${tag.color}30`,
+                        color: tag.color 
+                      }}
+                    >
+                      {tag.name}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+
+              <div className="mt-3 pt-3 border-t flex justify-between items-center">
+                <span className="text-xs text-muted-foreground">
+                  Última visita: {new Date(patient.last_visit).toLocaleDateString('es-MX', {
+                    day: 'numeric',
+                    month: 'short'
+                  })}
+                </span>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => handleScheduleAppointment(patient)}
+                >
+                  <Calendar className="h-3.5 w-3.5 mr-1" />
+                  Agendar
+                </Button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Schedule Appointment Dialog */}
+      {selectedPatient && (
+        <ScheduleAppointmentDialog
+          open={scheduleDialogOpen}
+          onOpenChange={setScheduleDialogOpen}
+          patient={selectedPatient}
+        />
+      )}
     </div>
   );
 }

@@ -40,9 +40,10 @@ const navigation: NavItem[] = [
 
 interface SidebarProps {
   userRole?: string;
+  isMobile?: boolean;
 }
 
-export function Sidebar({ userRole = 'admin' }: SidebarProps) {
+export function Sidebar({ userRole = 'admin', isMobile = false }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
 
@@ -50,6 +51,59 @@ export function Sidebar({ userRole = 'admin' }: SidebarProps) {
     (item) => !item.roles || item.roles.includes(userRole)
   );
 
+  // Mobile sidebar version
+  if (isMobile) {
+    return (
+      <aside className="flex h-full flex-col bg-sidebar">
+        {/* Logo */}
+        <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-4">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary">
+            <Stethoscope className="h-5 w-5 text-sidebar-primary-foreground" />
+          </div>
+          <span className="font-semibold text-sidebar-foreground">ClínicaAdmin</span>
+        </div>
+
+        {/* Navigation */}
+        <nav className="flex-1 space-y-1 p-3 overflow-y-auto">
+          {filteredNav.map((item) => {
+            const isActive = location.pathname === item.href || 
+              (item.href !== '/' && location.pathname.startsWith(item.href));
+            
+            return (
+              <NavLink
+                key={item.href}
+                to={item.href}
+                className={cn(
+                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                  'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                  isActive && 'bg-sidebar-accent text-sidebar-accent-foreground',
+                  !isActive && 'text-sidebar-foreground/70'
+                )}
+              >
+                <item.icon className={cn('h-5 w-5 shrink-0', isActive && 'text-sidebar-primary')} />
+                <span>{item.label}</span>
+              </NavLink>
+            );
+          })}
+        </nav>
+
+        {/* Footer */}
+        <div className="border-t border-sidebar-border p-3">
+          <button
+            className={cn(
+              'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/70 transition-colors',
+              'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+            )}
+          >
+            <LogOut className="h-5 w-5 shrink-0" />
+            <span>Cerrar sesión</span>
+          </button>
+        </div>
+      </aside>
+    );
+  }
+
+  // Desktop sidebar
   return (
     <aside
       className={cn(
