@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  Plus, 
-  Search, 
-  Filter, 
+import {
+  Plus,
+  Search,
+  Filter,
   MoreHorizontal,
   Phone,
   Mail,
   Calendar,
-  Tag
+  Tag,
+  Trash2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,78 +31,81 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ScheduleAppointmentDialog } from '@/components/patients/ScheduleAppointmentDialog';
 
-// Mock data
-const mockPatients = [
-  {
-    id: 1,
-    first_name: 'María',
-    last_name: 'García López',
-    full_name: 'María García López',
-    birth_date: '1985-03-15',
-    age: 39,
-    gender: 'F',
-    email: 'maria.garcia@email.com',
-    phone: '+52 55 1234 5678',
-    tags: [{ id: 1, name: 'VIP', color: '#EAB308' }, { id: 2, name: 'Diabetes', color: '#EF4444' }],
-    last_visit: '2024-01-15',
-  },
-  {
-    id: 2,
-    first_name: 'Carlos',
-    last_name: 'Rodríguez Mendoza',
-    full_name: 'Carlos Rodríguez Mendoza',
-    birth_date: '1978-08-22',
-    age: 45,
-    gender: 'M',
-    email: 'carlos.rodriguez@email.com',
-    phone: '+52 55 9876 5432',
-    tags: [{ id: 3, name: 'Hipertensión', color: '#3B82F6' }],
-    last_visit: '2024-01-20',
-  },
-  {
-    id: 3,
-    first_name: 'Laura',
-    last_name: 'Hernández Vega',
-    full_name: 'Laura Hernández Vega',
-    birth_date: '1992-11-08',
-    age: 31,
-    gender: 'F',
-    email: 'laura.hernandez@email.com',
-    phone: '+52 55 5555 4444',
-    tags: [],
-    last_visit: '2024-01-10',
-  },
-  {
-    id: 4,
-    first_name: 'Roberto',
-    last_name: 'Sánchez Flores',
-    full_name: 'Roberto Sánchez Flores',
-    birth_date: '1965-05-30',
-    age: 58,
-    gender: 'M',
-    email: null,
-    phone: '+52 55 3333 2222',
-    tags: [{ id: 1, name: 'VIP', color: '#EAB308' }],
-    last_visit: '2024-01-18',
-  },
-];
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useToast } from '@/hooks/use-toast';
+import api from '@/lib/api';
 
 export default function PatientsList() {
   const [searchQuery, setSearchQuery] = useState('');
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
-  const [selectedPatient, setSelectedPatient] = useState<typeof mockPatients[0] | null>(null);
+  const [selectedPatient, setSelectedPatient] = useState<any>(null);
 
-  const filteredPatients = mockPatients.filter(
-    (patient) =>
-      patient.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: patientsResponse, isLoading, error } = useQuery({
+    queryKey: ['patients'],
+    queryFn: async () => {
+      const response = await api.get('/patients');
+      return response.data;
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return api.delete(`/patients/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['patients'] });
+      toast({
+        title: 'Paciente eliminado',
+        description: 'El expediente del paciente ha sido retirado.',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.response?.data?.message || 'No se pudo eliminar el paciente.',
+      });
+    },
+  });
+
+  const handleDeletePatient = (id: number) => {
+    if (confirm('¿Estás seguro de que deseas eliminar a este paciente? Esta acción no se puede deshacer y eliminará su historial.')) {
+      deleteMutation.mutate(id);
+    }
+  };
+
+  const patients = patientsResponse?.data || [];
+
+  const filteredPatients = patients.filter(
+    (patient: any) =>
+      `${patient.first_name} ${patient.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
       patient.phone.includes(searchQuery) ||
       patient.email?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleScheduleAppointment = (patient: typeof mockPatients[0]) => {
+  const handleScheduleAppointment = (patient: any) => {
     setSelectedPatient(patient);
     setScheduleDialogOpen(true);
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-8 text-center text-destructive">
+        Error al cargar los pacientes. Por favor, intenta de nuevo.
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -110,7 +114,7 @@ export default function PatientsList() {
         <div className="page-header mb-0">
           <h1 className="page-title">Pacientes</h1>
           <p className="page-description">
-            {mockPatients.length} pacientes registrados
+            {patients.length} pacientes registrados
           </p>
         </div>
         <Button asChild className="gap-2">
@@ -147,32 +151,35 @@ export default function PatientsList() {
               <TableHead>Paciente</TableHead>
               <TableHead>Contacto</TableHead>
               <TableHead>Edad</TableHead>
-              <TableHead>Etiquetas</TableHead>
-              <TableHead>Última visita</TableHead>
+              <TableHead>Historial</TableHead>
+              <TableHead>Registro</TableHead>
               <TableHead className="w-12"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredPatients.map((patient) => {
+            {filteredPatients.map((patient: any) => {
               const initials = `${patient.first_name[0]}${patient.last_name[0]}`;
+              const birthDate = new Date(patient.date_of_birth);
+              const age = new Date().getFullYear() - birthDate.getFullYear();
+
               return (
                 <TableRow key={patient.id} className="group">
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <Avatar className="h-10 w-10">
                         <AvatarFallback className="bg-primary/10 text-primary">
-                          {initials}
+                          {initials.toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <Link 
+                        <Link
                           to={`/patients/${patient.id}`}
                           className="font-medium hover:text-primary transition-colors"
                         >
-                          {patient.full_name}
+                          {patient.first_name} {patient.last_name}
                         </Link>
                         <p className="text-sm text-muted-foreground">
-                          {patient.gender === 'M' ? 'Masculino' : 'Femenino'}
+                          {patient.gender}
                         </p>
                       </div>
                     </div>
@@ -192,35 +199,29 @@ export default function PatientsList() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <span className="font-medium">{patient.age}</span>
+                    <span className="font-medium">{age}</span>
                     <span className="text-muted-foreground"> años</span>
                   </TableCell>
                   <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {patient.tags.length > 0 ? (
-                        patient.tags.map((tag) => (
-                          <Badge
-                            key={tag.id}
-                            variant="outline"
-                            style={{ 
-                              backgroundColor: `${tag.color}15`,
-                              borderColor: `${tag.color}30`,
-                              color: tag.color 
-                            }}
-                          >
-                            <Tag className="mr-1 h-3 w-3" />
-                            {tag.name}
-                          </Badge>
-                        ))
+                    <div className="flex flex-wrap gap-1 text-sm text-muted-foreground">
+                      {patient.blood_type && (
+                        <Badge variant="outline" className="text-xs">
+                          Tipo: {patient.blood_type}
+                        </Badge>
+                      )}
+                      {patient.allergies ? (
+                        <span className="text-xs text-destructive truncate max-w-[150px]" title={patient.allergies}>
+                          Alergias: {patient.allergies}
+                        </span>
                       ) : (
-                        <span className="text-sm text-muted-foreground">—</span>
+                        <span className="text-xs">Sin alergias</span>
                       )}
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5 text-sm">
                       <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                      {new Date(patient.last_visit).toLocaleDateString('es-MX', {
+                      {new Date(patient.created_at).toLocaleDateString('es-MX', {
                         day: 'numeric',
                         month: 'short',
                         year: 'numeric',
@@ -235,12 +236,22 @@ export default function PatientsList() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem>Ver perfil</DropdownMenuItem>
-                        <DropdownMenuItem>Editar</DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link to={`/patients/${patient.id}`}>Ver perfil</Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link to={`/patients/${patient.id}/edit`}>Editar</Link>
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleScheduleAppointment(patient)}>
                           Agendar cita
                         </DropdownMenuItem>
-                        <DropdownMenuItem>Ver historial</DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={() => handleDeletePatient(patient.id)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Eliminar
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -253,24 +264,27 @@ export default function PatientsList() {
 
       {/* Mobile Cards */}
       <div className="md:hidden space-y-3">
-        {filteredPatients.map((patient) => {
+        {filteredPatients.map((patient: any) => {
           const initials = `${patient.first_name[0]}${patient.last_name[0]}`;
+          const birthDate = new Date(patient.date_of_birth);
+          const age = new Date().getFullYear() - birthDate.getFullYear();
+
           return (
-            <div 
-              key={patient.id} 
+            <div
+              key={patient.id}
               className="p-4 rounded-lg border bg-card"
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
                   <Avatar className="h-10 w-10">
                     <AvatarFallback className="bg-primary/10 text-primary">
-                      {initials}
+                      {initials.toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="font-medium">{patient.full_name}</p>
+                    <p className="font-medium">{patient.first_name} {patient.last_name}</p>
                     <p className="text-sm text-muted-foreground">
-                      {patient.age} años • {patient.gender === 'M' ? 'M' : 'F'}
+                      {age} años • {patient.gender}
                     </p>
                   </div>
                 </div>
@@ -281,16 +295,26 @@ export default function PatientsList() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem>Ver perfil</DropdownMenuItem>
-                    <DropdownMenuItem>Editar</DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link to={`/patients/${patient.id}`}>Ver perfil</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link to={`/patients/${patient.id}/edit`}>Editar</Link>
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => handleScheduleAppointment(patient)}>
                       Agendar cita
                     </DropdownMenuItem>
-                    <DropdownMenuItem>Ver historial</DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onClick={() => handleDeletePatient(patient.id)}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Eliminar
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
-              
+
               <div className="mt-3 space-y-1.5 text-sm">
                 <div className="flex items-center gap-1.5">
                   <Phone className="h-3.5 w-3.5 text-muted-foreground" />
@@ -304,34 +328,28 @@ export default function PatientsList() {
                 )}
               </div>
 
-              {patient.tags.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-1">
-                  {patient.tags.map((tag) => (
-                    <Badge
-                      key={tag.id}
-                      variant="outline"
-                      className="text-xs"
-                      style={{ 
-                        backgroundColor: `${tag.color}15`,
-                        borderColor: `${tag.color}30`,
-                        color: tag.color 
-                      }}
-                    >
-                      {tag.name}
-                    </Badge>
-                  ))}
-                </div>
-              )}
+              <div className="mt-3 flex flex-wrap gap-1">
+                {patient.blood_type && (
+                  <Badge variant="outline" className="text-xs">
+                    {patient.blood_type}
+                  </Badge>
+                )}
+                {patient.allergies && (
+                  <Badge variant="outline" className="text-xs text-destructive border-destructive/30 bg-destructive/5">
+                    Alergias
+                  </Badge>
+                )}
+              </div>
 
               <div className="mt-3 pt-3 border-t flex justify-between items-center">
                 <span className="text-xs text-muted-foreground">
-                  Última visita: {new Date(patient.last_visit).toLocaleDateString('es-MX', {
+                  Registrado: {new Date(patient.created_at).toLocaleDateString('es-MX', {
                     day: 'numeric',
                     month: 'short'
                   })}
                 </span>
-                <Button 
-                  size="sm" 
+                <Button
+                  size="sm"
                   variant="outline"
                   onClick={() => handleScheduleAppointment(patient)}
                 >

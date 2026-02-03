@@ -14,33 +14,30 @@ import { Badge } from '@/components/ui/badge';
 import { Branch, User } from '@/types';
 
 interface HeaderProps {
-  user?: User;
   currentBranch?: Branch;
   branches?: Branch[];
   onBranchChange?: (branchId: number) => void;
 }
 
-export function Header({ 
-  user = { 
-    id: 1, 
-    name: 'Dr. Admin', 
-    email: 'admin@clinica.com', 
-    role: 'admin',
-    is_active: true,
-    branches: [],
-    permissions: [],
-    created_at: ''
-  },
+export function Header({
   currentBranch = { id: 1, code: 'CTR', name: 'Clínica Centro', address: '', phone: '', opens_at: '08:00', closes_at: '20:00', is_active: true, created_at: '', updated_at: '' },
   branches = [
     { id: 1, code: 'CTR', name: 'Clínica Centro', address: '', phone: '', opens_at: '08:00', closes_at: '20:00', is_active: true, created_at: '', updated_at: '' },
     { id: 2, code: 'SUR', name: 'Clínica Sur', address: '', phone: '', opens_at: '08:00', closes_at: '20:00', is_active: true, created_at: '', updated_at: '' },
   ],
-  onBranchChange 
+  onBranchChange
 }: HeaderProps) {
-  const initials = user.name
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.location.href = '/login';
+  };
+
+  const initials = (user.name || 'Admin')
     .split(' ')
-    .map((n) => n[0])
+    .map((n: string) => n[0])
     .join('')
     .toUpperCase()
     .slice(0, 2);
@@ -58,8 +55,8 @@ export function Header({
       <div className="flex items-center gap-4">
         <div className="relative w-80">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input 
-            placeholder="Buscar pacientes, citas..." 
+          <Input
+            placeholder="Buscar pacientes, citas..."
             className="pl-9 bg-muted/50 border-0 focus-visible:ring-1"
           />
         </div>
@@ -82,7 +79,7 @@ export function Header({
             <DropdownMenuLabel>Cambiar sede</DropdownMenuLabel>
             <DropdownMenuSeparator />
             {branches.map((branch) => (
-              <DropdownMenuItem 
+              <DropdownMenuItem
                 key={branch.id}
                 onClick={() => onBranchChange?.(branch.id)}
                 className="gap-2"
@@ -128,7 +125,7 @@ export function Header({
             <DropdownMenuItem>Perfil</DropdownMenuItem>
             <DropdownMenuItem>Preferencias</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive">
+            <DropdownMenuItem className="text-destructive" onClick={handleLogout}>
               Cerrar sesión
             </DropdownMenuItem>
           </DropdownMenuContent>

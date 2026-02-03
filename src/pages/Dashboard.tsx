@@ -1,75 +1,82 @@
-import { 
-  Calendar, 
-  Clock, 
-  CheckCircle2, 
+import {
+  Calendar,
+  Clock,
+  CheckCircle2,
   AlertTriangle,
   DollarSign,
   Users,
-  TrendingUp
+  TrendingUp,
+  Loader2
 } from 'lucide-react';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { AppointmentsList } from '@/components/dashboard/AppointmentsList';
 import { RevenueChart } from '@/components/dashboard/RevenueChart';
 import { QuickActions } from '@/components/dashboard/QuickActions';
-
-// Mock data - en producción vendría de la API
-const mockAppointments = [
-  {
-    id: 1,
-    patient: { full_name: 'María García López' },
-    doctor: { name: 'Dr. Juan Pérez' },
-    time_start: '09:00',
-    time_end: '09:30',
-    status: 'confirmed' as const,
-  },
-  {
-    id: 2,
-    patient: { full_name: 'Carlos Rodríguez' },
-    doctor: { name: 'Dra. Ana Martínez' },
-    time_start: '10:00',
-    time_end: '10:45',
-    status: 'scheduled' as const,
-  },
-  {
-    id: 3,
-    patient: { full_name: 'Laura Hernández' },
-    doctor: { name: 'Dr. Juan Pérez' },
-    time_start: '11:00',
-    time_end: '11:30',
-    status: 'completed' as const,
-  },
-  {
-    id: 4,
-    patient: { full_name: 'Roberto Sánchez' },
-    doctor: { name: 'Dra. Ana Martínez' },
-    time_start: '12:00',
-    time_end: '12:30',
-    status: 'no_show' as const,
-  },
-];
-
-const mockRevenueData = [
-  { date: 'Lun', revenue: 4500 },
-  { date: 'Mar', revenue: 6200 },
-  { date: 'Mié', revenue: 5800 },
-  { date: 'Jue', revenue: 7100 },
-  { date: 'Vie', revenue: 8500 },
-  { date: 'Sáb', revenue: 3200 },
-  { date: 'Dom', revenue: 0 },
-];
+import { useQuery } from '@tanstack/react-query';
+import api from '@/lib/api';
 
 export default function Dashboard() {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['dashboard'],
+    queryFn: async () => {
+      const response = await api.get('/dashboard');
+      return response.data;
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex h-[80vh] items-center justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-8 text-center text-destructive">
+        Error al cargar los datos del dashboard.
+      </div>
+    );
+  }
+
+  const { stats, next_appointments, revenue_chart } = data;
+
+  // Adapt appointments for the AppointmentsList component
+  const dashboardAppointments = next_appointments.map((apt: any) => {
+    const startDate = new Date(apt.appointment_date);
+    const endDate = new Date(startDate.getTime() + (apt.duration || 30) * 60000);
+
+    return {
+      id: apt.id,
+      patient: {
+        full_name: `${apt.patient.first_name} ${apt.patient.last_name}`
+      },
+      doctor: {
+        name: `Dr. ${apt.doctor.first_name} ${apt.doctor.last_name}`
+      },
+      time_start: startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      time_end: endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      status: apt.status,
+    };
+  });
+
+  const currencyFormatter = new Intl.NumberFormat('es-MX', {
+    style: 'currency',
+    currency: 'MXN',
+  });
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Page header */}
       <div className="page-header">
         <h1 className="page-title">Dashboard</h1>
         <p className="page-description">
-          Resumen del día • Clínica Centro • {new Date().toLocaleDateString('es-MX', { 
-            weekday: 'long', 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
+          Resumen del día • Todas las sedes • {new Date().toLocaleDateString('es-MX', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
           })}
         </p>
       </div>
@@ -78,27 +85,26 @@ export default function Dashboard() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Citas hoy"
-          value={12}
-          subtitle="4 pendientes de confirmar"
+          value={stats.appointments_today}
+          subtitle={`${stats.pending_today} pendientes de inicio`}
           icon={Calendar}
           variant="primary"
         />
         <StatCard
           title="Confirmadas"
-          value={8}
+          value={stats.confirmed_today}
           icon={CheckCircle2}
           variant="success"
-          trend={{ value: 12, label: 'vs ayer' }}
         />
         <StatCard
           title="Completadas"
-          value={5}
+          value={stats.completed_today}
           icon={Clock}
           variant="default"
         />
         <StatCard
           title="No asistieron"
-          value={1}
+          value={stats.no_show_today}
           icon={AlertTriangle}
           variant="warning"
         />
@@ -108,24 +114,29 @@ export default function Dashboard() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard
           title="Ingresos hoy"
-          value="$4,500"
+          value={currencyFormatter.format(stats.revenue_today)}
           icon={DollarSign}
           variant="success"
-          trend={{ value: 8, label: 'vs ayer' }}
         />
         <StatCard
           title="Ingresos del mes"
-          value="$128,450"
+          value={currencyFormatter.format(stats.revenue_month)}
           icon={TrendingUp}
           variant="primary"
-          trend={{ value: 15, label: 'vs mes anterior' }}
+          trend={{
+            value: Math.abs(stats.revenue_trend),
+            label: stats.revenue_trend >= 0 ? 'arriba del mes anterior' : 'debajo del mes anterior'
+          }}
         />
         <StatCard
           title="Nuevos pacientes (mes)"
-          value={24}
+          value={stats.new_patients_month}
           icon={Users}
           variant="default"
-          trend={{ value: 6, label: 'vs mes anterior' }}
+          trend={{
+            value: Math.abs(stats.patients_trend),
+            label: stats.patients_trend >= 0 ? 'más que el mes pasado' : 'menos que el mes pasado'
+          }}
         />
       </div>
 
@@ -133,7 +144,7 @@ export default function Dashboard() {
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Appointments list */}
         <div className="lg:col-span-2">
-          <AppointmentsList appointments={mockAppointments} />
+          <AppointmentsList appointments={dashboardAppointments} />
         </div>
 
         {/* Right column */}
@@ -143,7 +154,8 @@ export default function Dashboard() {
       </div>
 
       {/* Revenue chart */}
-      <RevenueChart data={mockRevenueData} />
+      <RevenueChart data={revenue_chart} />
     </div>
   );
 }
+

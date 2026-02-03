@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { DollarSign, User, CreditCard, Banknote, ArrowRightLeft } from 'lucide-react';
+import { DollarSign, User, CreditCard, Banknote, ArrowRightLeft, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -29,7 +30,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { PaymentMethod } from '@/types';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import api from '@/lib/api';
 
 const paymentSchema = z.object({
   appointment_id: z.string().min(1, 'Selecciona una cita'),
@@ -37,10 +39,10 @@ const paymentSchema = z.object({
     (val) => !isNaN(Number(val)) && Number(val) > 0,
     'El monto debe ser mayor a 0'
   ),
-  payment_method: z.enum(['cash', 'card', 'transfer'], {
+  payment_method: z.enum(['cash', 'credit_card', 'debit_card', 'transfer', 'insurance'], {
     required_error: 'Selecciona un método de pago',
   }),
-  reference: z.string().optional(),
+  transaction_id: z.string().optional(),
   notes: z.string().max(500, 'Máximo 500 caracteres').optional(),
 });
 
@@ -51,21 +53,27 @@ interface RegisterPaymentDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const mockAppointments = [
-  { id: '1', patient: 'María García López', doctor: 'Dr. Juan Pérez', date: '2024-01-26', time: '10:00' },
-  { id: '2', patient: 'Carlos Rodríguez', doctor: 'Dra. Ana Martínez', date: '2024-01-26', time: '11:00' },
-  { id: '3', patient: 'Laura Hernández', doctor: 'Dr. Carlos López', date: '2024-01-26', time: '12:00' },
-];
-
-const paymentMethods: { value: PaymentMethod; label: string; icon: React.ElementType }[] = [
+const paymentMethods = [
   { value: 'cash', label: 'Efectivo', icon: Banknote },
-  { value: 'card', label: 'Tarjeta', icon: CreditCard },
-  { value: 'transfer', label: 'Transferencia', icon: ArrowRightLeft },
+  { value: 'credit_card', label: 'T. Crédito', icon: CreditCard },
+  { value: 'transfer', label: 'Transf.', icon: ArrowRightLeft },
 ];
 
 export function RegisterPaymentDialog({ open, onOpenChange }: RegisterPaymentDialogProps) {
   const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const queryClient = useQueryClient();
+
+  const { data: appointmentsResponse } = useQuery({
+    queryKey: ['appointments', 'pending_payment'],
+    queryFn: async () => {
+      // En un caso real podrías filtrar citas completadas sin pago
+      const response = await api.get('/appointments');
+      return response.data;
+    },
+    enabled: open,
+  });
+
+  const appointments = appointmentsResponse?.data || [];
 
   const form = useForm<PaymentFormData>({
     resolver: zodResolver(paymentSchema),
@@ -73,53 +81,71 @@ export function RegisterPaymentDialog({ open, onOpenChange }: RegisterPaymentDia
       appointment_id: '',
       amount: '',
       payment_method: undefined,
-      reference: '',
+      transaction_id: '',
       notes: '',
     },
   });
 
-  const selectedMethod = form.watch('payment_method');
+  const mutation = useMutation({
+    mutationFn: async (values: PaymentFormData) => {
+      const selectedApt = appointments.find((a: any) => a.id.toString() === values.appointment_id);
 
-  const onSubmit = async (data: PaymentFormData) => {
-    setIsSubmitting(true);
-    
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    toast({
-      title: 'Pago registrado',
-      description: `Se registró un pago de $${Number(data.amount).toLocaleString('es-MX')} MXN`,
-    });
-    
-    setIsSubmitting(false);
-    onOpenChange(false);
-    form.reset();
+      const payload = {
+        appointment_id: parseInt(values.appointment_id),
+        patient_id: selectedApt?.patient_id,
+        amount: parseFloat(values.amount),
+        payment_method: values.payment_method,
+        transaction_id: values.transaction_id,
+        notes: values.notes,
+        payment_date: new Date().toISOString().split('T')[0],
+        status: 'completed'
+      };
+
+      return api.post('/payments', payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      toast({
+        title: 'Pago registrado',
+        description: 'La transacción se ha guardado correctamente.',
+      });
+      onOpenChange(false);
+      form.reset();
+    },
+    onError: (error: any) => {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.response?.data?.message || 'No se pudo registrar el pago.',
+      });
+    }
+  });
+
+  const onSubmit = (data: PaymentFormData) => {
+    mutation.mutate(data);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <DollarSign className="h-5 w-5 text-green-600" />
             Registrar pago
           </DialogTitle>
           <DialogDescription>
-            Registra el pago de una consulta completada
+            Registra el pago de una consulta médica
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            {/* Appointment */}
             <FormField
               control={form.control}
               name="appointment_id"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="flex items-center gap-1.5">
-                    <User className="h-4 w-4" />
-                    Cita / Paciente
-                  </FormLabel>
+                  <FormLabel>Cita / Paciente</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
@@ -127,12 +153,12 @@ export function RegisterPaymentDialog({ open, onOpenChange }: RegisterPaymentDia
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {mockAppointments.map((apt) => (
-                        <SelectItem key={apt.id} value={apt.id}>
+                      {appointments.map((apt: any) => (
+                        <SelectItem key={apt.id} value={apt.id.toString()}>
                           <div className="flex flex-col">
-                            <span className="font-medium">{apt.patient}</span>
+                            <span className="font-medium">{apt.patient?.first_name} {apt.patient?.last_name}</span>
                             <span className="text-xs text-muted-foreground">
-                              {apt.doctor} • {apt.date} {apt.time}
+                              {new Date(apt.appointment_date).toLocaleDateString()} — {apt.doctor?.first_name}
                             </span>
                           </div>
                         </SelectItem>
@@ -144,7 +170,6 @@ export function RegisterPaymentDialog({ open, onOpenChange }: RegisterPaymentDia
               )}
             />
 
-            {/* Amount */}
             <FormField
               control={form.control}
               name="amount"
@@ -153,17 +178,8 @@ export function RegisterPaymentDialog({ open, onOpenChange }: RegisterPaymentDia
                   <FormLabel>Monto (MXN)</FormLabel>
                   <FormControl>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                        $
-                      </span>
-                      <Input 
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="0.00"
-                        className="pl-7"
-                        {...field} 
-                      />
+                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input type="number" step="0.01" className="pl-9" {...field} />
                     </div>
                   </FormControl>
                   <FormMessage />
@@ -171,7 +187,6 @@ export function RegisterPaymentDialog({ open, onOpenChange }: RegisterPaymentDia
               )}
             />
 
-            {/* Payment Method */}
             <FormField
               control={form.control}
               name="payment_method"
@@ -187,11 +202,11 @@ export function RegisterPaymentDialog({ open, onOpenChange }: RegisterPaymentDia
                           key={method.value}
                           type="button"
                           variant={isSelected ? 'default' : 'outline'}
-                          className="flex flex-col gap-1 h-auto py-3"
+                          className="flex flex-col gap-1 h-auto py-2"
                           onClick={() => field.onChange(method.value)}
                         >
-                          <Icon className="h-5 w-5" />
-                          <span className="text-xs">{method.label}</span>
+                          <Icon className="h-4 w-4" />
+                          <span className="text-[10px]">{method.label}</span>
                         </Button>
                       );
                     })}
@@ -201,67 +216,40 @@ export function RegisterPaymentDialog({ open, onOpenChange }: RegisterPaymentDia
               )}
             />
 
-            {/* Reference (for card/transfer) */}
-            {(selectedMethod === 'card' || selectedMethod === 'transfer') && (
-              <FormField
-                control={form.control}
-                name="reference"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      {selectedMethod === 'card' ? 'Referencia de terminal' : 'Referencia de transferencia'}
-                    </FormLabel>
-                    <FormControl>
-                      <Input 
-                        placeholder={
-                          selectedMethod === 'card' 
-                            ? 'Ej: REF-123456' 
-                            : 'Ej: TRANS-789012'
-                        }
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-
-            {/* Notes */}
             <FormField
               control={form.control}
-              name="notes"
+              name="transaction_id"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Notas (opcional)</FormLabel>
+                  <FormLabel>ID de Transacción / Referencia</FormLabel>
                   <FormControl>
-                    <Textarea 
-                      placeholder="Notas adicionales sobre el pago..."
-                      className="resize-none"
-                      rows={2}
-                      {...field} 
-                    />
+                    <Input placeholder="Ej. REF123456" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            {/* Actions */}
-            <div className="flex justify-end gap-3 pt-4">
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={() => onOpenChange(false)}
-                disabled={isSubmitting}
-              >
-                Cancelar
+            <FormField
+              control={form.control}
+              name="notes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Notas</FormLabel>
+                  <FormControl>
+                    <Textarea rows={2} {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <DialogFooter>
+              <Button type="submit" disabled={mutation.isPending} className="w-full">
+                {mutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Finalizar Cobro
               </Button>
-              <Button type="submit" disabled={isSubmitting} className="gap-2">
-                <DollarSign className="h-4 w-4" />
-                {isSubmitting ? 'Registrando...' : 'Registrar pago'}
-              </Button>
-            </div>
+            </DialogFooter>
           </form>
         </Form>
       </DialogContent>

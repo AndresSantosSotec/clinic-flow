@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { 
-  Search, 
+import {
+  Search,
   Filter,
   Bell,
   Clock,
@@ -11,7 +11,8 @@ import {
   User,
   Calendar,
   AlertTriangle,
-  Send
+  Send,
+  Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,164 +33,93 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { ReminderStatus, ReminderType } from '@/types';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import api from '@/lib/api';
 
-// Mock data
-const mockReminders = [
-  {
-    id: 1,
-    appointment: { 
-      id: 1, 
-      patient: 'María García López', 
-      patient_email: 'maria@email.com',
-      doctor: 'Dr. Juan Pérez',
-      date: '2024-01-27',
-      time: '10:00'
-    },
-    type: '24h' as ReminderType,
-    recipient_type: 'patient' as const,
-    scheduled_at: '2024-01-26T10:00:00',
-    status: 'pending' as ReminderStatus,
-    attempts: 0,
-  },
-  {
-    id: 2,
-    appointment: { 
-      id: 1, 
-      patient: 'María García López', 
-      patient_email: 'maria@email.com',
-      doctor: 'Dr. Juan Pérez',
-      date: '2024-01-27',
-      time: '10:00'
-    },
-    type: '2h' as ReminderType,
-    recipient_type: 'patient' as const,
-    scheduled_at: '2024-01-27T08:00:00',
-    status: 'pending' as ReminderStatus,
-    attempts: 0,
-  },
-  {
-    id: 3,
-    appointment: { 
-      id: 2, 
-      patient: 'Carlos Rodríguez', 
-      patient_email: 'carlos@email.com',
-      doctor: 'Dra. Ana Martínez',
-      date: '2024-01-26',
-      time: '14:00'
-    },
-    type: '24h' as ReminderType,
-    recipient_type: 'patient' as const,
-    scheduled_at: '2024-01-25T14:00:00',
-    status: 'sent' as ReminderStatus,
-    sent_at: '2024-01-25T14:01:23',
-    attempts: 1,
-  },
-  {
-    id: 4,
-    appointment: { 
-      id: 2, 
-      patient: 'Carlos Rodríguez', 
-      patient_email: 'carlos@email.com',
-      doctor: 'Dra. Ana Martínez',
-      date: '2024-01-26',
-      time: '14:00'
-    },
-    type: '2h' as ReminderType,
-    recipient_type: 'patient' as const,
-    scheduled_at: '2024-01-26T12:00:00',
-    status: 'sent' as ReminderStatus,
-    sent_at: '2024-01-26T12:00:45',
-    attempts: 1,
-  },
-  {
-    id: 5,
-    appointment: { 
-      id: 3, 
-      patient: 'Laura Hernández', 
-      patient_email: 'laura@email.com',
-      doctor: 'Dr. Carlos López',
-      date: '2024-01-26',
-      time: '09:00'
-    },
-    type: '24h' as ReminderType,
-    recipient_type: 'patient' as const,
-    scheduled_at: '2024-01-25T09:00:00',
-    status: 'failed' as ReminderStatus,
-    attempts: 3,
-    last_error: 'Email address not found',
-  },
-];
-
-const statusConfig: Record<ReminderStatus, { label: string; icon: React.ElementType; className: string }> = {
+const statusConfig: Record<string, { label: string; icon: React.ElementType; className: string }> = {
   pending: { label: 'Pendiente', icon: Clock, className: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
   sent: { label: 'Enviado', icon: CheckCircle, className: 'bg-green-100 text-green-800 border-green-200' },
   failed: { label: 'Fallido', icon: XCircle, className: 'bg-red-100 text-red-800 border-red-200' },
 };
 
-const typeLabels: Record<ReminderType, string> = {
-  '24h': '24 horas antes',
-  '2h': '2 horas antes',
-};
-
 export default function RemindersList() {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [isRetrying, setIsRetrying] = useState<number | null>(null);
 
-  const filteredReminders = mockReminders.filter((reminder) => {
-    const matchesSearch = 
-      reminder.appointment.patient.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      reminder.appointment.patient_email.toLowerCase().includes(searchQuery.toLowerCase());
+  const { data: remindersResponse, isLoading, error } = useQuery({
+    queryKey: ['reminders'],
+    queryFn: async () => {
+      const response = await api.get('/reminders');
+      return response.data;
+    },
+  });
+
+  const sendMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return api.post(`/reminders/${id}/send`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reminders'] });
+      toast({
+        title: 'Acción realizada',
+        description: 'El recordatorio se ha procesado correctamente.',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.response?.data?.message || 'No se pudo enviar el recordatorio.',
+      });
+    }
+  });
+
+  const reminders = remindersResponse?.data || [];
+
+  const filteredReminders = reminders.filter((reminder: any) => {
+    const matchesSearch =
+      reminder.appointment?.patient?.first_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      reminder.appointment?.patient?.last_name?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || reminder.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
+  if (isLoading) {
+    return (
+      <div className="flex h-96 items-center justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-8 text-center text-destructive">
+        Error al cargar los recordatorios.
+      </div>
+    );
+  }
+
   const stats = {
-    pending: mockReminders.filter(r => r.status === 'pending').length,
-    sent: mockReminders.filter(r => r.status === 'sent').length,
-    failed: mockReminders.filter(r => r.status === 'failed').length,
-  };
-
-  const handleRetry = async (reminderId: number) => {
-    setIsRetrying(reminderId);
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    toast({
-      title: 'Reintento programado',
-      description: 'El recordatorio se enviará en breve.',
-    });
-    
-    setIsRetrying(null);
-  };
-
-  const handleSendNow = async (reminderId: number) => {
-    setIsRetrying(reminderId);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    toast({
-      title: 'Recordatorio enviado',
-      description: 'El recordatorio se ha enviado correctamente.',
-    });
-    
-    setIsRetrying(null);
+    pending: reminders.filter((r: any) => r.status === 'pending').length,
+    sent: reminders.filter((r: any) => r.status === 'sent').length,
+    failed: reminders.filter((r: any) => r.status === 'failed').length,
   };
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Header */}
       <div className="page-header">
         <h1 className="page-title">Recordatorios</h1>
         <p className="page-description">
-          Gestión de recordatorios de citas por correo
+          Gestión de recordatorios automáticos y manuales para pacientes
         </p>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="pt-4 pb-4">
             <div className="flex items-center gap-3">
@@ -197,7 +127,7 @@ export default function RemindersList() {
                 <Clock className="h-5 w-5 text-yellow-600" />
               </div>
               <div>
-                <p className="text-xl md:text-2xl font-bold">{stats.pending}</p>
+                <p className="text-xl font-bold">{stats.pending}</p>
                 <p className="text-xs text-muted-foreground">Pendientes</p>
               </div>
             </div>
@@ -210,7 +140,7 @@ export default function RemindersList() {
                 <CheckCircle className="h-5 w-5 text-green-600" />
               </div>
               <div>
-                <p className="text-xl md:text-2xl font-bold">{stats.sent}</p>
+                <p className="text-xl font-bold">{stats.sent}</p>
                 <p className="text-xs text-muted-foreground">Enviados</p>
               </div>
             </div>
@@ -223,7 +153,7 @@ export default function RemindersList() {
                 <XCircle className="h-5 w-5 text-red-600" />
               </div>
               <div>
-                <p className="text-xl md:text-2xl font-bold">{stats.failed}</p>
+                <p className="text-xl font-bold">{stats.failed}</p>
                 <p className="text-xs text-muted-foreground">Fallidos</p>
               </div>
             </div>
@@ -236,7 +166,7 @@ export default function RemindersList() {
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Buscar por paciente o email..."
+            placeholder="Buscar por paciente..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
@@ -244,10 +174,10 @@ export default function RemindersList() {
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-full sm:w-[180px]">
-            <SelectValue placeholder="Filtrar por estado" />
+            <SelectValue placeholder="Estado" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos los estados</SelectItem>
+            <SelectItem value="all">Todos</SelectItem>
             <SelectItem value="pending">Pendientes</SelectItem>
             <SelectItem value="sent">Enviados</SelectItem>
             <SelectItem value="failed">Fallidos</SelectItem>
@@ -256,127 +186,85 @@ export default function RemindersList() {
       </div>
 
       {/* Table */}
-      <div className="data-table-container overflow-x-auto">
+      <div className="rounded-md border bg-card overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Paciente</TableHead>
-              <TableHead className="hidden md:table-cell">Cita</TableHead>
-              <TableHead>Tipo</TableHead>
+              <TableHead>Cita</TableHead>
               <TableHead>Estado</TableHead>
-              <TableHead className="hidden lg:table-cell">Programado</TableHead>
-              <TableHead className="w-24">Acciones</TableHead>
+              <TableHead>Programado</TableHead>
+              <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredReminders.map((reminder) => {
-              const StatusIcon = statusConfig[reminder.status].icon;
-              return (
-                <TableRow key={reminder.id} className="group">
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div className="hidden sm:flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
-                        <User className="h-4 w-4 text-primary" />
+            {filteredReminders.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                  No se encontraron recordatorios.
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredReminders.map((reminder: any) => {
+                const config = statusConfig[reminder.status] || statusConfig.pending;
+                const StatusIcon = config.icon;
+                return (
+                  <TableRow key={reminder.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 items-center justify-center rounded-full bg-primary/10 flex">
+                          <User className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-medium">
+                            {reminder.appointment?.patient?.first_name} {reminder.appointment?.patient?.last_name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {reminder.appointment?.patient?.email || 'Sin correo'}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium">{reminder.appointment.patient}</p>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm">
+                        <p className="font-medium">Dr. {reminder.appointment?.doctor?.first_name}</p>
                         <p className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Mail className="h-3 w-3" />
-                          {reminder.appointment.patient_email}
+                          <Calendar className="h-3 w-3" />
+                          {new Date(reminder.appointment?.appointment_date).toLocaleDateString()}
                         </p>
                       </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    <div className="text-sm">
-                      <p className="font-medium">{reminder.appointment.doctor}</p>
-                      <p className="text-muted-foreground flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        {reminder.appointment.date} {reminder.appointment.time}
-                      </p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="gap-1">
-                      <Bell className="h-3 w-3" />
-                      {typeLabels[reminder.type]}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={`gap-1 ${statusConfig[reminder.status].className}`}>
-                      <StatusIcon className="h-3 w-3" />
-                      {statusConfig[reminder.status].label}
-                    </Badge>
-                    {reminder.status === 'failed' && reminder.last_error && (
-                      <p className="text-xs text-destructive mt-1 flex items-center gap-1">
-                        <AlertTriangle className="h-3 w-3" />
-                        {reminder.last_error}
-                      </p>
-                    )}
-                  </TableCell>
-                  <TableCell className="hidden lg:table-cell">
-                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                      <Clock className="h-3.5 w-3.5" />
-                      {new Date(reminder.scheduled_at).toLocaleDateString('es-MX', {
-                        day: 'numeric',
-                        month: 'short',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </div>
-                    {reminder.sent_at && (
-                      <p className="text-xs text-green-600 mt-0.5">
-                        Enviado: {new Date(reminder.sent_at).toLocaleTimeString('es-MX', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </p>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      {reminder.status === 'pending' && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="gap-1"
-                          onClick={() => handleSendNow(reminder.id)}
-                          disabled={isRetrying === reminder.id}
-                        >
-                          <Send className="h-3 w-3" />
-                          <span className="hidden sm:inline">Enviar</span>
-                        </Button>
-                      )}
-                      {reminder.status === 'failed' && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="gap-1"
-                          onClick={() => handleRetry(reminder.id)}
-                          disabled={isRetrying === reminder.id}
-                        >
-                          <RefreshCw className={`h-3 w-3 ${isRetrying === reminder.id ? 'animate-spin' : ''}`} />
-                          <span className="hidden sm:inline">Reintentar</span>
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={`gap-1 ${config.className}`}>
+                        <StatusIcon className="h-3 w-3" />
+                        {config.label}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {new Date(reminder.scheduled_at).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => sendMutation.mutate(reminder.id)}
+                        disabled={sendMutation.isPending || reminder.status === 'sent'}
+                      >
+                        {sendMutation.isPending && sendMutation.variables === reminder.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                        ) : (
+                          <Send className="h-3 w-3 mr-1" />
+                        )}
+                        Reenviar
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
           </TableBody>
         </Table>
       </div>
-
-      {filteredReminders.length === 0 && (
-        <div className="text-center py-12">
-          <Bell className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-medium">No hay recordatorios</h3>
-          <p className="text-muted-foreground">
-            No se encontraron recordatorios con los filtros seleccionados.
-          </p>
-        </div>
-      )}
     </div>
   );
 }

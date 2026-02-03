@@ -1,8 +1,9 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save } from 'lucide-react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -23,6 +24,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import api from '@/lib/api';
 
 const patientSchema = z.object({
   first_name: z
@@ -33,10 +35,8 @@ const patientSchema = z.object({
     .string()
     .min(1, 'Los apellidos son requeridos')
     .max(100, 'Máximo 100 caracteres'),
-  birth_date: z.string().min(1, 'La fecha de nacimiento es requerida'),
-  gender: z.enum(['M', 'F', 'O'], {
-    required_error: 'Selecciona el sexo',
-  }),
+  date_of_birth: z.string().min(1, 'La fecha de nacimiento es requerida'),
+  gender: z.string().min(1, 'Selecciona el sexo'),
   email: z
     .string()
     .email('Correo electrónico inválido')
@@ -44,52 +44,95 @@ const patientSchema = z.object({
     .or(z.literal('')),
   phone: z
     .string()
-    .min(10, 'El teléfono debe tener al menos 10 dígitos')
-    .max(20, 'Máximo 20 caracteres')
-    .regex(/^[\d\s+()-]+$/, 'Formato de teléfono inválido'),
+    .min(8, 'El teléfono debe tener al menos 8 dígitos')
+    .max(20, 'Máximo 20 caracteres'),
   address: z.string().max(500, 'Máximo 500 caracteres').optional(),
   allergies: z.string().max(1000, 'Máximo 1000 caracteres').optional(),
-  blood_type: z.enum(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', '']).optional(),
-  emergency_contact: z.string().max(100, 'Máximo 100 caracteres').optional(),
-  emergency_phone: z
-    .string()
-    .regex(/^[\d\s+()-]*$/, 'Formato de teléfono inválido')
-    .optional(),
-  notes: z.string().max(2000, 'Máximo 2000 caracteres').optional(),
+  blood_type: z.string().optional(),
+  medical_history: z.string().max(2000, 'Máximo 2000 caracteres').optional(),
 });
 
 type PatientFormValues = z.infer<typeof patientSchema>;
 
 export default function PatientForm() {
+  const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const isEditing = !!id;
+
+  const { data: patient, isLoading: isLoadingPatient } = useQuery({
+    queryKey: ['patients', id],
+    queryFn: async () => {
+      const response = await api.get(`/patients/${id}`);
+      return response.data;
+    },
+    enabled: isEditing,
+  });
 
   const form = useForm<PatientFormValues>({
     resolver: zodResolver(patientSchema),
     defaultValues: {
       first_name: '',
       last_name: '',
-      birth_date: '',
-      gender: undefined,
+      date_of_birth: '',
+      gender: '',
       email: '',
       phone: '',
       address: '',
       allergies: '',
       blood_type: '',
-      emergency_contact: '',
-      emergency_phone: '',
-      notes: '',
+      medical_history: '',
+    },
+    values: patient ? {
+      first_name: patient.first_name,
+      last_name: patient.last_name,
+      date_of_birth: patient.date_of_birth?.split('T')[0] || '',
+      gender: patient.gender,
+      email: patient.email || '',
+      phone: patient.phone,
+      address: patient.address || '',
+      allergies: patient.allergies || '',
+      blood_type: patient.blood_type || '',
+      medical_history: patient.medical_history || '',
+    } : undefined,
+  });
+
+  const mutation = useMutation({
+    mutationFn: async (values: PatientFormValues) => {
+      if (isEditing) {
+        return api.put(`/patients/${id}`, values);
+      }
+      return api.post('/patients', values);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['patients'] });
+      toast({
+        title: isEditing ? 'Paciente actualizado' : 'Paciente registrado',
+        description: `La información ha sido guardada correctamente.`,
+      });
+      navigate('/patients');
+    },
+    onError: (error: any) => {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.response?.data?.message || 'Ocurrió un error al guardar.',
+      });
     },
   });
 
-  const onSubmit = async (data: PatientFormValues) => {
-    console.log('Patient data:', data);
-    toast({
-      title: 'Paciente registrado',
-      description: `${data.first_name} ${data.last_name} ha sido registrado exitosamente.`,
-    });
-    navigate('/patients');
+  const onSubmit = (data: PatientFormValues) => {
+    mutation.mutate(data);
   };
+
+  if (isEditing && isLoadingPatient) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in max-w-3xl">
@@ -101,8 +144,10 @@ export default function PatientForm() {
           </Link>
         </Button>
         <div className="page-header mb-0">
-          <h1 className="page-title">Nuevo paciente</h1>
-          <p className="page-description">Registra la información del paciente</p>
+          <h1 className="page-title">{isEditing ? 'Editar paciente' : 'Nuevo paciente'}</h1>
+          <p className="page-description">
+            {isEditing ? 'Actualiza los datos del paciente' : 'Registra la información del paciente'}
+          </p>
         </div>
       </div>
 
@@ -140,7 +185,7 @@ export default function PatientForm() {
               />
               <FormField
                 control={form.control}
-                name="birth_date"
+                name="date_of_birth"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Fecha de nacimiento *</FormLabel>
@@ -157,16 +202,16 @@ export default function PatientForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Sexo *</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Seleccionar" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="M">Masculino</SelectItem>
-                        <SelectItem value="F">Femenino</SelectItem>
-                        <SelectItem value="O">Otro</SelectItem>
+                        <SelectItem value="Masculino">Masculino</SelectItem>
+                        <SelectItem value="Femenino">Femenino</SelectItem>
+                        <SelectItem value="Otro">Otro</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -179,7 +224,7 @@ export default function PatientForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Tipo de sangre</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Seleccionar" />
@@ -214,7 +259,7 @@ export default function PatientForm() {
                   <FormItem>
                     <FormLabel>Teléfono *</FormLabel>
                     <FormControl>
-                      <Input placeholder="+52 55 1234 5678" {...field} />
+                      <Input placeholder="2200-1100" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -249,39 +294,6 @@ export default function PatientForm() {
             </div>
           </div>
 
-          {/* Emergencia */}
-          <div className="form-section">
-            <h2 className="form-section-title">Contacto de emergencia</h2>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FormField
-                control={form.control}
-                name="emergency_contact"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nombre del contacto</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Juan García" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="emergency_phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Teléfono de emergencia</FormLabel>
-                    <FormControl>
-                      <Input placeholder="+52 55 9876 5432" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-          </div>
-
           {/* Información médica */}
           <div className="form-section">
             <h2 className="form-section-title">Información médica</h2>
@@ -293,9 +305,9 @@ export default function PatientForm() {
                   <FormItem>
                     <FormLabel>Alergias conocidas</FormLabel>
                     <FormControl>
-                      <Textarea 
-                        placeholder="Lista de alergias a medicamentos, alimentos, etc." 
-                        {...field} 
+                      <Textarea
+                        placeholder="Lista de alergias a medicamentos, alimentos, etc."
+                        {...field}
                       />
                     </FormControl>
                     <FormDescription>
@@ -307,14 +319,14 @@ export default function PatientForm() {
               />
               <FormField
                 control={form.control}
-                name="notes"
+                name="medical_history"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Notas adicionales</FormLabel>
+                    <FormLabel>Antecedentes médicos / Notas</FormLabel>
                     <FormControl>
-                      <Textarea 
-                        placeholder="Información adicional relevante..." 
-                        {...field} 
+                      <Textarea
+                        placeholder="Información adicional relevante..."
+                        {...field}
                       />
                     </FormControl>
                     <FormMessage />
@@ -325,13 +337,17 @@ export default function PatientForm() {
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end gap-3">
-            <Button variant="outline" type="button" asChild>
+          <div className="flex justify-end gap-3 pt-6 border-t">
+            <Button variant="outline" type="button" asChild disabled={mutation.isPending}>
               <Link to="/patients">Cancelar</Link>
             </Button>
-            <Button type="submit" className="gap-2">
-              <Save className="h-4 w-4" />
-              Guardar paciente
+            <Button type="submit" className="gap-2" disabled={mutation.isPending}>
+              {mutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              {isEditing ? 'Guardar cambios' : 'Registrar paciente'}
             </Button>
           </div>
         </form>

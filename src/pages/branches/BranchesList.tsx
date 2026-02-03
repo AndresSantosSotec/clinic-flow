@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  Plus, 
-  Building2, 
-  Clock, 
-  Phone, 
+import {
+  Plus,
+  Building2,
+  Clock,
+  Phone,
   Mail,
   MoreHorizontal,
   MapPin,
@@ -28,56 +28,62 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-// Mock data
-const mockBranches = [
-  {
-    id: 1,
-    code: 'CTR',
-    name: 'Clínica Centro',
-    address: 'Av. Reforma 123, Col. Centro, CDMX',
-    phone: '+52 55 1234 5678',
-    email: 'centro@clinica.com',
-    opens_at: '08:00',
-    closes_at: '20:00',
-    is_active: true,
-    doctors_count: 5,
-    appointments_today: 24,
-  },
-  {
-    id: 2,
-    code: 'SUR',
-    name: 'Clínica Sur',
-    address: 'Av. Insurgentes Sur 456, Col. Del Valle, CDMX',
-    phone: '+52 55 9876 5432',
-    email: 'sur@clinica.com',
-    opens_at: '09:00',
-    closes_at: '19:00',
-    is_active: true,
-    doctors_count: 3,
-    appointments_today: 18,
-  },
-  {
-    id: 3,
-    code: 'NTE',
-    name: 'Clínica Norte',
-    address: 'Blvd. Avila Camacho 789, Col. Polanco, CDMX',
-    phone: '+52 55 5555 4444',
-    email: 'norte@clinica.com',
-    opens_at: '08:00',
-    closes_at: '18:00',
-    is_active: false,
-    doctors_count: 2,
-    appointments_today: 0,
-  },
-];
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import api from '@/lib/api';
+import { toast } from '@/hooks/use-toast';
 
 export default function BranchesList() {
-  const [branches, setBranches] = useState(mockBranches);
+  const queryClient = useQueryClient();
 
-  const toggleBranchStatus = (id: number) => {
-    setBranches(branches.map(branch => 
-      branch.id === id ? { ...branch, is_active: !branch.is_active } : branch
-    ));
+  const { data: branchesResponse, isLoading, error } = useQuery({
+    queryKey: ['branches'],
+    queryFn: async () => {
+      const response = await api.get('/branches');
+      return response.data;
+    },
+  });
+
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ id, is_active }: { id: number; is_active: boolean }) => {
+      const response = await api.put(`/branches/${id}`, { is_active });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['branches'] });
+      toast({
+        title: 'Estado actualizado',
+        description: 'La sede ha cambiado su estado correctamente.',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.response?.data?.message || 'No se pudo actualizar el estado.',
+      });
+    },
+  });
+
+  const branches = branchesResponse?.data || [];
+
+  if (isLoading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-8 text-center text-destructive">
+        Error al cargar las sedes. Por favor, intenta de nuevo.
+      </div>
+    );
+  }
+
+  const toggleBranchStatus = (id: number, currentStatus: boolean) => {
+    updateStatusMutation.mutate({ id, is_active: !currentStatus });
   };
 
   return (
@@ -122,7 +128,9 @@ export default function BranchesList() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem>Editar</DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link to={`/branches/${branch.id}`}>Editar</Link>
+                    </DropdownMenuItem>
                     <DropdownMenuItem>Ver horarios</DropdownMenuItem>
                     <DropdownMenuItem>Ver usuarios</DropdownMenuItem>
                   </DropdownMenuContent>
@@ -142,9 +150,9 @@ export default function BranchesList() {
                     {branch.is_active ? 'Activa' : 'Inactiva'}
                   </span>
                 </div>
-                <Switch 
+                <Switch
                   checked={branch.is_active}
-                  onCheckedChange={() => toggleBranchStatus(branch.id)}
+                  onCheckedChange={() => toggleBranchStatus(branch.id, branch.is_active)}
                 />
               </div>
 
@@ -157,7 +165,7 @@ export default function BranchesList() {
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4 text-muted-foreground" />
                   <span className="text-muted-foreground">
-                    {branch.opens_at} - {branch.closes_at}
+                    {branch.opens_at?.substring(0, 5)} - {branch.closes_at?.substring(0, 5)}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -175,12 +183,12 @@ export default function BranchesList() {
               {/* Stats */}
               <div className="flex gap-4 pt-2 border-t">
                 <div>
-                  <p className="text-2xl font-bold">{branch.doctors_count}</p>
+                  <p className="text-2xl font-bold">{branch.doctors_count || 0}</p>
                   <p className="text-xs text-muted-foreground">Médicos</p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{branch.appointments_today}</p>
-                  <p className="text-xs text-muted-foreground">Citas hoy</p>
+                  <p className="text-2xl font-bold">{branch.appointments_count || 0}</p>
+                  <p className="text-xs text-muted-foreground">Citas (Histórico)</p>
                 </div>
               </div>
             </CardContent>

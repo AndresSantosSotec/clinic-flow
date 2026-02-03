@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  Search, 
-  Filter, 
+import {
+  Search,
+  Filter,
   Stethoscope,
   Mail,
   Phone,
   Building2,
   Calendar,
-  MoreHorizontal
+  MoreHorizontal,
+  Plus,
+  Trash2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,72 +24,91 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-// Mock data
-const mockDoctors = [
-  {
-    id: 1,
-    name: 'Dr. Juan Carlos Pérez González',
-    email: 'dr.perez@clinica.com',
-    phone: '+52 55 1234 5678',
-    specialty: 'Cardiología',
-    license_number: 'CONACEM-12345',
-    is_active: true,
-    branches: [{ id: 1, name: 'Clínica Centro' }, { id: 2, name: 'Clínica Sur' }],
-    appointments_today: 8,
-  },
-  {
-    id: 2,
-    name: 'Dra. Ana María Martínez',
-    email: 'dra.martinez@clinica.com',
-    phone: '+52 55 9876 5432',
-    specialty: 'Pediatría',
-    license_number: 'CONACEM-23456',
-    is_active: true,
-    branches: [{ id: 1, name: 'Clínica Centro' }],
-    appointments_today: 12,
-  },
-  {
-    id: 3,
-    name: 'Dr. Carlos López Hernández',
-    email: 'dr.lopez@clinica.com',
-    phone: '+52 55 5555 4444',
-    specialty: 'Medicina General',
-    license_number: 'SSA-34567',
-    is_active: true,
-    branches: [{ id: 2, name: 'Clínica Sur' }],
-    appointments_today: 6,
-  },
-  {
-    id: 4,
-    name: 'Dra. Patricia Sánchez',
-    email: 'dra.sanchez@clinica.com',
-    phone: '+52 55 3333 2222',
-    specialty: 'Dermatología',
-    license_number: 'CONACEM-45678',
-    is_active: false,
-    branches: [{ id: 1, name: 'Clínica Centro' }],
-    appointments_today: 0,
-  },
-];
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useToast } from '@/hooks/use-toast';
+import api from '@/lib/api';
 
 export default function DoctorsList() {
   const [searchQuery, setSearchQuery] = useState('');
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const filteredDoctors = mockDoctors.filter(
-    (doctor) =>
-      doctor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['doctors'],
+    queryFn: async () => {
+      const response = await api.get('/doctors');
+      return response.data;
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return api.delete(`/doctors/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['doctors'] });
+      toast({
+        title: 'Médico eliminado',
+        description: 'El profesional ha sido retirado del sistema.',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.response?.data?.message || 'No se pudo eliminar el médico.',
+      });
+    },
+  });
+
+  const handleDeleteDoctor = (id: number) => {
+    if (confirm('¿Estás seguro de que deseas eliminar a este médico? Esta acción no se puede deshacer.')) {
+      deleteMutation.mutate(id);
+    }
+  };
+
+  const doctors = data?.data || [];
+
+  const filteredDoctors = doctors.filter(
+    (doctor: any) =>
+      `${doctor.first_name} ${doctor.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
       doctor.specialty.toLowerCase().includes(searchQuery.toLowerCase()) ||
       doctor.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  if (isLoading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-8 text-center text-destructive">
+        Error al cargar los médicos.
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="page-header">
-        <h1 className="page-title">Médicos</h1>
-        <p className="page-description">
-          {mockDoctors.filter(d => d.is_active).length} médicos activos
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="page-header mb-0">
+          <h1 className="page-title">Médicos</h1>
+          <p className="page-description">
+            {doctors.filter((d: any) => d.is_active).length} médicos activos
+          </p>
+        </div>
+        <Button asChild className="gap-2">
+          <Link to="/doctors/new">
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">Nuevo médico</span>
+            <span className="sm:hidden">Nuevo</span>
+          </Link>
+        </Button>
       </div>
 
       {/* Filters */}
@@ -109,13 +130,8 @@ export default function DoctorsList() {
 
       {/* Doctors Grid */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {filteredDoctors.map((doctor) => {
-          const initials = doctor.name
-            .split(' ')
-            .filter((_, i) => i === 0 || i === 2)
-            .map(n => n[0])
-            .join('')
-            .toUpperCase();
+        {filteredDoctors.map((doctor: any) => {
+          const initials = `${doctor.first_name[0]}${doctor.last_name[0]}`.toUpperCase();
 
           return (
             <Card key={doctor.id} className="hover:shadow-md transition-shadow">
@@ -128,13 +144,13 @@ export default function DoctorsList() {
                   </Avatar>
 
                   <div className="flex items-center gap-2 mb-1">
-                    <Link 
+                    <Link
                       to={`/doctors/${doctor.id}`}
-                      className="font-semibold hover:text-primary transition-colors"
+                      className="font-semibold hover:text-primary transition-colors line-clamp-1"
                     >
-                      {doctor.name}
+                      {doctor.first_name} {doctor.last_name}
                     </Link>
-                    <Badge variant={doctor.is_active ? 'default' : 'secondary'} className="text-xs">
+                    <Badge variant={doctor.is_active ? 'secondary' : 'outline'} className="text-[10px] h-5">
                       {doctor.is_active ? 'Activo' : 'Inactivo'}
                     </Badge>
                   </div>
@@ -149,28 +165,32 @@ export default function DoctorsList() {
                       <Mail className="h-3.5 w-3.5" />
                       <span className="truncate">{doctor.email}</span>
                     </div>
-                    <div className="flex items-center justify-center gap-1.5">
-                      <Phone className="h-3.5 w-3.5" />
-                      {doctor.phone}
-                    </div>
+                    {doctor.phone && (
+                      <div className="flex items-center justify-center gap-1.5">
+                        <Phone className="h-3.5 w-3.5" />
+                        {doctor.phone}
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex flex-wrap gap-1 mt-3 justify-center">
-                    {doctor.branches.map((branch) => (
-                      <Badge key={branch.id} variant="outline" className="text-xs">
+                    {doctor.branch ? (
+                      <Badge variant="outline" className="text-xs">
                         <Building2 className="mr-1 h-3 w-3" />
-                        {branch.name}
+                        {doctor.branch.name}
                       </Badge>
-                    ))}
+                    ) : (
+                      <span className="text-xs text-muted-foreground italic">Sin sede asignada</span>
+                    )}
                   </div>
 
                   <div className="mt-4 pt-4 border-t w-full flex items-center justify-between">
                     <div className="flex items-center gap-1.5 text-sm">
                       <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium">{doctor.appointments_today}</span>
-                      <span className="text-muted-foreground">citas hoy</span>
+                      <span className="font-medium">{doctor.appointments?.length || 0}</span>
+                      <span className="text-muted-foreground">citas</span>
                     </div>
-                    
+
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -181,8 +201,19 @@ export default function DoctorsList() {
                         <DropdownMenuItem asChild>
                           <Link to={`/doctors/${doctor.id}`}>Ver perfil</Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem>Ver agenda</DropdownMenuItem>
-                        <DropdownMenuItem>Editar</DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link to={`/doctors/${doctor.id}/edit`}>Editar</Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link to="/appointments/new">Agendar cita</Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={() => handleDeleteDoctor(doctor.id)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Eliminar
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>

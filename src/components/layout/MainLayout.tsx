@@ -15,6 +15,8 @@ import {
 export function MainLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const isMobile = useIsMobile();
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const userRole = user.role || 'admin';
 
   if (isMobile) {
     return (
@@ -28,13 +30,13 @@ export function MainLayout() {
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="w-[280px] p-0">
-              <Sidebar userRole="admin" isMobile />
+              <Sidebar userRole={userRole} isMobile />
             </SheetContent>
           </Sheet>
           <span className="font-semibold text-primary">ClínicaAdmin</span>
           <div className="w-10" /> {/* Spacer for centering */}
         </header>
-        
+
         <main className="p-4">
           <Outlet />
         </main>
@@ -44,7 +46,7 @@ export function MainLayout() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Sidebar userRole="admin" />
+      <Sidebar userRole={userRole} />
       <div
         className={cn(
           'transition-all duration-300 ease-in-out',

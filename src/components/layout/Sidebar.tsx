@@ -14,21 +14,40 @@ import {
   ChevronLeft,
   LogOut,
   Bell,
+  Shield,
+  Key,
+  ChevronDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 interface NavItem {
   label: string;
   icon: React.ElementType;
   href: string;
   roles?: string[];
+  children?: NavItem[];
 }
 
 const navigation: NavItem[] = [
   { label: 'Dashboard', icon: LayoutDashboard, href: '/' },
   { label: 'Sedes', icon: Building2, href: '/branches', roles: ['admin'] },
-  { label: 'Usuarios', icon: Users, href: '/users', roles: ['admin'] },
+  { 
+    label: 'Usuarios', 
+    icon: Users, 
+    href: '/users', 
+    roles: ['admin'],
+    children: [
+      { label: 'Lista de Usuarios', icon: Users, href: '/users' },
+      { label: 'Roles', icon: Shield, href: '/roles' },
+      { label: 'Permisos', icon: Key, href: '/permissions' },
+    ]
+  },
   { label: 'Pacientes', icon: UserCircle, href: '/patients' },
   { label: 'Agenda', icon: Calendar, href: '/appointments' },
   { label: 'Consultas', icon: Stethoscope, href: '/encounters', roles: ['doctor'] },
@@ -45,11 +64,22 @@ interface SidebarProps {
 
 export function Sidebar({ userRole = 'admin', isMobile = false }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({});
   const location = useLocation();
 
   const filteredNav = navigation.filter(
     (item) => !item.roles || item.roles.includes(userRole)
   );
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.location.href = '/login';
+  };
+
+  const toggleMenu = (href: string) => {
+    setOpenMenus(prev => ({ ...prev, [href]: !prev[href] }));
+  };
 
   // Mobile sidebar version
   if (isMobile) {
@@ -66,9 +96,57 @@ export function Sidebar({ userRole = 'admin', isMobile = false }: SidebarProps) 
         {/* Navigation */}
         <nav className="flex-1 space-y-1 p-3 overflow-y-auto">
           {filteredNav.map((item) => {
-            const isActive = location.pathname === item.href || 
+            const isActive = location.pathname === item.href ||
               (item.href !== '/' && location.pathname.startsWith(item.href));
-            
+
+            if (item.children) {
+              const hasActiveChild = item.children.some(child =>
+                location.pathname === child.href ||
+                (child.href !== '/' && location.pathname.startsWith(child.href))
+              );
+
+              return (
+                <Collapsible key={item.href} open={openMenus[item.href] || hasActiveChild}>
+                  <CollapsibleTrigger
+                    onClick={() => toggleMenu(item.href)}
+                    className={cn(
+                      'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                      'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                      hasActiveChild && 'bg-sidebar-accent text-sidebar-accent-foreground',
+                      !hasActiveChild && 'text-sidebar-foreground/70'
+                    )}
+                  >
+                    <item.icon className={cn('h-5 w-5 shrink-0', hasActiveChild && 'text-sidebar-primary')} />
+                    <span className="flex-1 text-left">{item.label}</span>
+                    <ChevronDown className={cn(
+                      'h-4 w-4 transition-transform',
+                      (openMenus[item.href] || hasActiveChild) && 'rotate-180'
+                    )} />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="pl-4 space-y-1">
+                    {item.children.map((child) => {
+                      const isChildActive = location.pathname === child.href;
+                      return (
+                        <NavLink
+                          key={child.href}
+                          to={child.href}
+                          className={cn(
+                            'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                            'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                            isChildActive && 'bg-sidebar-accent text-sidebar-accent-foreground',
+                            !isChildActive && 'text-sidebar-foreground/60'
+                          )}
+                        >
+                          <child.icon className={cn('h-4 w-4 shrink-0', isChildActive && 'text-sidebar-primary')} />
+                          <span>{child.label}</span>
+                        </NavLink>
+                      );
+                    })}
+                  </CollapsibleContent>
+                </Collapsible>
+              );
+            }
+
             return (
               <NavLink
                 key={item.href}
@@ -90,6 +168,7 @@ export function Sidebar({ userRole = 'admin', isMobile = false }: SidebarProps) 
         {/* Footer */}
         <div className="border-t border-sidebar-border p-3">
           <button
+            onClick={handleLogout}
             className={cn(
               'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/70 transition-colors',
               'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
@@ -129,11 +208,59 @@ export function Sidebar({ userRole = 'admin', isMobile = false }: SidebarProps) 
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 p-3">
+      <nav className="flex-1 space-y-1 p-3 overflow-y-auto">
         {filteredNav.map((item) => {
-          const isActive = location.pathname === item.href || 
+          const isActive = location.pathname === item.href ||
             (item.href !== '/' && location.pathname.startsWith(item.href));
-          
+
+          if (item.children && !collapsed) {
+            const hasActiveChild = item.children.some(child =>
+              location.pathname === child.href ||
+              (child.href !== '/' && location.pathname.startsWith(child.href))
+            );
+
+            return (
+              <Collapsible key={item.href} open={openMenus[item.href] || hasActiveChild}>
+                <CollapsibleTrigger
+                  onClick={() => toggleMenu(item.href)}
+                  className={cn(
+                    'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                    'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                    hasActiveChild && 'bg-sidebar-accent text-sidebar-accent-foreground',
+                    !hasActiveChild && 'text-sidebar-foreground/70'
+                  )}
+                >
+                  <item.icon className={cn('h-5 w-5 shrink-0', hasActiveChild && 'text-sidebar-primary')} />
+                  <span className="flex-1 text-left">{item.label}</span>
+                  <ChevronDown className={cn(
+                    'h-4 w-4 transition-transform',
+                    (openMenus[item.href] || hasActiveChild) && 'rotate-180'
+                  )} />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pl-4 space-y-1">
+                  {item.children.map((child) => {
+                    const isChildActive = location.pathname === child.href;
+                    return (
+                      <NavLink
+                        key={child.href}
+                        to={child.href}
+                        className={cn(
+                          'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                          'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                          isChildActive && 'bg-sidebar-accent text-sidebar-accent-foreground',
+                          !isChildActive && 'text-sidebar-foreground/60'
+                        )}
+                      >
+                        <child.icon className={cn('h-4 w-4 shrink-0', isChildActive && 'text-sidebar-primary')} />
+                        <span>{child.label}</span>
+                      </NavLink>
+                    );
+                  })}
+                </CollapsibleContent>
+              </Collapsible>
+            );
+          }
+
           const linkContent = (
             <NavLink
               key={item.href}
@@ -169,6 +296,7 @@ export function Sidebar({ userRole = 'admin', isMobile = false }: SidebarProps) 
       {/* Footer */}
       <div className="border-t border-sidebar-border p-3">
         <button
+          onClick={handleLogout}
           className={cn(
             'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/70 transition-colors',
             'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',

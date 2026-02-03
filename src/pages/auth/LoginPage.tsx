@@ -15,6 +15,9 @@ import {
 } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 
+import { useState } from 'react';
+import api from '@/lib/api';
+
 const loginSchema = z.object({
   email: z
     .string()
@@ -22,7 +25,7 @@ const loginSchema = z.object({
     .email('Ingresa un correo válido'),
   password: z
     .string()
-    .min(8, 'La contraseña debe tener al menos 8 caracteres'),
+    .min(1, 'La contraseña es requerida'),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -30,6 +33,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 export default function LoginPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -40,14 +44,29 @@ export default function LoginPage() {
   });
 
   const onSubmit = async (data: LoginFormValues) => {
-    console.log('Login attempt:', data.email);
-    
-    // Mock login - en producción conectaría con Laravel Sanctum
-    toast({
-      title: 'Bienvenido',
-      description: 'Has iniciado sesión correctamente.',
-    });
-    navigate('/');
+    setIsLoading(true);
+    try {
+      const response = await api.post('/login', data);
+      const { access_token, user } = response.data;
+
+      localStorage.setItem('token', access_token);
+      localStorage.setItem('user', JSON.stringify(user));
+
+      toast({
+        title: 'Bienvenido',
+        description: 'Has iniciado sesión correctamente.',
+      });
+      navigate('/');
+    } catch (error: any) {
+      console.error('Login error:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error de acceso',
+        description: error.response?.data?.message || 'Credenciales incorrectas o problema de conexión.',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -86,11 +105,11 @@ export default function LoginPage() {
                     <FormControl>
                       <div className="relative">
                         <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input 
+                        <Input
                           type="email"
-                          placeholder="tu@clinica.com" 
+                          placeholder="tu@clinica.com"
                           className="pl-10"
-                          {...field} 
+                          {...field}
                         />
                       </div>
                     </FormControl>
@@ -108,11 +127,11 @@ export default function LoginPage() {
                     <FormControl>
                       <div className="relative">
                         <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input 
+                        <Input
                           type="password"
-                          placeholder="••••••••" 
+                          placeholder="••••••••"
                           className="pl-10"
-                          {...field} 
+                          {...field}
                         />
                       </div>
                     </FormControl>
@@ -131,9 +150,9 @@ export default function LoginPage() {
                 </a>
               </div>
 
-              <Button type="submit" className="w-full gap-2" size="lg">
-                Iniciar sesión
-                <ArrowRight className="h-4 w-4" />
+              <Button type="submit" className="w-full gap-2" size="lg" disabled={isLoading}>
+                {isLoading ? 'Iniciando sesión...' : 'Iniciar sesión'}
+                {!isLoading && <ArrowRight className="h-4 w-4" />}
               </Button>
             </form>
           </Form>
@@ -154,12 +173,12 @@ export default function LoginPage() {
         <div className="absolute inset-0 opacity-10">
           <svg className="h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
             <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
-              <path d="M 10 0 L 0 0 0 10" fill="none" stroke="white" strokeWidth="0.5"/>
+              <path d="M 10 0 L 0 0 0 10" fill="none" stroke="white" strokeWidth="0.5" />
             </pattern>
             <rect width="100" height="100" fill="url(#grid)" />
           </svg>
         </div>
-        
+
         <div className="relative z-10 flex flex-col justify-center px-16 text-primary-foreground">
           <div className="max-w-lg">
             <h2 className="text-4xl font-bold mb-6">

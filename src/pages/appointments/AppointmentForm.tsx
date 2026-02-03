@@ -1,8 +1,13 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, Search } from 'lucide-react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  ArrowLeft,
+  Save,
+  Search,
+  Loader2
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -23,6 +28,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import api from '@/lib/api';
 
 const appointmentSchema = z.object({
   patient_id: z.string().min(1, 'Selecciona un paciente'),
@@ -40,25 +48,6 @@ const appointmentSchema = z.object({
 
 type AppointmentFormValues = z.infer<typeof appointmentSchema>;
 
-// Mock data
-const mockPatients = [
-  { id: '1', name: 'María García López' },
-  { id: '2', name: 'Carlos Rodríguez Mendoza' },
-  { id: '3', name: 'Laura Hernández Vega' },
-  { id: '4', name: 'Roberto Sánchez Flores' },
-];
-
-const mockBranches = [
-  { id: '1', name: 'Clínica Centro' },
-  { id: '2', name: 'Clínica Sur' },
-];
-
-const mockDoctors = [
-  { id: '1', name: 'Dr. Juan Pérez', specialty: 'Medicina General' },
-  { id: '2', name: 'Dra. Ana Martínez', specialty: 'Cardiología' },
-  { id: '3', name: 'Dr. Carlos López', specialty: 'Pediatría' },
-];
-
 const timeSlots = [
   '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
   '11:00', '11:30', '12:00', '12:30', '13:00', '13:30',
@@ -69,6 +58,37 @@ const timeSlots = [
 export default function AppointmentForm() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
+
+  // Fetch data for selects
+  const { data: patientsData } = useQuery({
+    queryKey: ['patients'],
+    queryFn: async () => {
+      const response = await api.get('/patients');
+      return response.data;
+    },
+  });
+
+  const { data: branchesData } = useQuery({
+    queryKey: ['branches'],
+    queryFn: async () => {
+      const response = await api.get('/branches');
+      return response.data;
+    },
+  });
+
+  const { data: doctorsData } = useQuery({
+    queryKey: ['doctors'],
+    queryFn: async () => {
+      const response = await api.get('/doctors');
+      return response.data;
+    },
+  });
+
+  const patients = patientsData?.data || [];
+  const branches = branchesData?.data || [];
+  const doctors = doctorsData?.data || [];
 
   const form = useForm<AppointmentFormValues>({
     resolver: zodResolver(appointmentSchema),
@@ -84,13 +104,54 @@ export default function AppointmentForm() {
     },
   });
 
-  const onSubmit = async (data: AppointmentFormValues) => {
-    console.log('Appointment data:', data);
-    toast({
-      title: 'Cita programada',
-      description: 'La cita ha sido programada exitosamente.',
-    });
-    navigate('/appointments');
+  // Pre-fill patient if coming from patient profile
+  useEffect(() => {
+    const patientId = searchParams.get('patient');
+    if (patientId && patients.length > 0) {
+      const patientExists = patients.find((p: any) => p.id.toString() === patientId);
+      if (patientExists) {
+        form.setValue('patient_id', patientId);
+      }
+    }
+  }, [searchParams, patients, form]);
+
+  const mutation = useMutation({
+    mutationFn: async (values: AppointmentFormValues) => {
+      // Combine date and time
+      const appointment_date = `${values.date}T${values.time}:00`;
+
+      const payload = {
+        patient_id: parseInt(values.patient_id),
+        doctor_id: parseInt(values.doctor_id),
+        branch_id: parseInt(values.branch_id),
+        appointment_date,
+        duration: parseInt(values.duration),
+        reason: values.reason,
+        notes: values.notes,
+        status: 'scheduled'
+      };
+
+      return api.post('/appointments', payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      toast({
+        title: 'Cita programada',
+        description: 'La cita ha sido programada exitosamente.',
+      });
+      navigate('/appointments');
+    },
+    onError: (error: any) => {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.response?.data?.message || 'Ocurrió un error al agendar la cita.',
+      });
+    }
+  });
+
+  const onSubmit = (data: AppointmentFormValues) => {
+    mutation.mutate(data);
   };
 
   return (
@@ -126,9 +187,9 @@ export default function AppointmentForm() {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {mockPatients.map((patient) => (
-                        <SelectItem key={patient.id} value={patient.id}>
-                          {patient.name}
+                      {patients.map((patient: any) => (
+                        <SelectItem key={patient.id} value={patient.id.toString()}>
+                          {patient.first_name} {patient.last_name}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -159,8 +220,8 @@ export default function AppointmentForm() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {mockBranches.map((branch) => (
-                          <SelectItem key={branch.id} value={branch.id}>
+                        {branches.map((branch: any) => (
+                          <SelectItem key={branch.id} value={branch.id.toString()}>
                             {branch.name}
                           </SelectItem>
                         ))}
@@ -183,9 +244,9 @@ export default function AppointmentForm() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {mockDoctors.map((doctor) => (
-                          <SelectItem key={doctor.id} value={doctor.id}>
-                            {doctor.name} — {doctor.specialty}
+                        {doctors.map((doctor: any) => (
+                          <SelectItem key={doctor.id} value={doctor.id.toString()}>
+                            Dr. {doctor.first_name} {doctor.last_name} — {doctor.specialty}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -275,9 +336,9 @@ export default function AppointmentForm() {
                   <FormItem>
                     <FormLabel>Motivo de la consulta *</FormLabel>
                     <FormControl>
-                      <Textarea 
-                        placeholder="Describa brevemente el motivo de la consulta..." 
-                        {...field} 
+                      <Textarea
+                        placeholder="Describa brevemente el motivo de la consulta..."
+                        {...field}
                       />
                     </FormControl>
                     <FormMessage />
@@ -291,9 +352,9 @@ export default function AppointmentForm() {
                   <FormItem>
                     <FormLabel>Notas adicionales</FormLabel>
                     <FormControl>
-                      <Textarea 
-                        placeholder="Información adicional para el médico..." 
-                        {...field} 
+                      <Textarea
+                        placeholder="Información adicional para el médico..."
+                        {...field}
                       />
                     </FormControl>
                     <FormMessage />
@@ -304,12 +365,16 @@ export default function AppointmentForm() {
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end gap-3">
-            <Button variant="outline" type="button" asChild>
+          <div className="flex justify-end gap-3 pt-6 border-t">
+            <Button variant="outline" type="button" asChild disabled={mutation.isPending}>
               <Link to="/appointments">Cancelar</Link>
             </Button>
-            <Button type="submit" className="gap-2">
-              <Save className="h-4 w-4" />
+            <Button type="submit" className="gap-2" disabled={mutation.isPending}>
+              {mutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
               Programar cita
             </Button>
           </div>
