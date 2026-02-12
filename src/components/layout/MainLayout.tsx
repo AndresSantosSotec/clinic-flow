@@ -12,11 +12,12 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 
+import { useAuth } from '@/hooks/use-auth';
+
 export function MainLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const isMobile = useIsMobile();
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const userRole = user.role || 'admin';
+  const { user } = useAuth();
 
   if (isMobile) {
     return (
@@ -30,7 +31,7 @@ export function MainLayout() {
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="w-[280px] p-0">
-              <Sidebar userRole={userRole} isMobile />
+              <Sidebar isMobile />
             </SheetContent>
           </Sheet>
           <span className="font-semibold text-primary">ClínicaAdmin</span>
@@ -46,7 +47,7 @@ export function MainLayout() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Sidebar userRole={userRole} />
+      <Sidebar />
       <div
         className={cn(
           'transition-all duration-300 ease-in-out',

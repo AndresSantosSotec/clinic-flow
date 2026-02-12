@@ -30,6 +30,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ScheduleAppointmentDialog } from '@/components/patients/ScheduleAppointmentDialog';
+import { Can } from '@/components/auth/Can';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
@@ -117,13 +118,15 @@ export default function PatientsList() {
             {patients.length} pacientes registrados
           </p>
         </div>
-        <Button asChild className="gap-2">
-          <Link to="/patients/new">
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">Nuevo paciente</span>
-            <span className="sm:hidden">Nuevo</span>
-          </Link>
-        </Button>
+        <Can permission="create-patients">
+          <Button asChild className="gap-2">
+            <Link to="/patients/new">
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Nuevo paciente</span>
+              <span className="sm:hidden">Nuevo</span>
+            </Link>
+          </Button>
+        </Can>
       </div>
 
       {/* Filters */}
@@ -239,19 +242,25 @@ export default function PatientsList() {
                         <DropdownMenuItem asChild>
                           <Link to={`/patients/${patient.id}`}>Ver perfil</Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem asChild>
-                          <Link to={`/patients/${patient.id}/edit`}>Editar</Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleScheduleAppointment(patient)}>
-                          Agendar cita
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onClick={() => handleDeletePatient(patient.id)}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Eliminar
-                        </DropdownMenuItem>
+                        <Can permission="edit-patients">
+                          <DropdownMenuItem asChild>
+                            <Link to={`/patients/${patient.id}/edit`}>Editar</Link>
+                          </DropdownMenuItem>
+                        </Can>
+                        <Can permission="create-appointments">
+                          <DropdownMenuItem onClick={() => handleScheduleAppointment(patient)}>
+                            Agendar cita
+                          </DropdownMenuItem>
+                        </Can>
+                        <Can permission="delete-patients">
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={() => handleDeletePatient(patient.id)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Eliminar
+                          </DropdownMenuItem>
+                        </Can>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -298,19 +307,25 @@ export default function PatientsList() {
                     <DropdownMenuItem asChild>
                       <Link to={`/patients/${patient.id}`}>Ver perfil</Link>
                     </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link to={`/patients/${patient.id}/edit`}>Editar</Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleScheduleAppointment(patient)}>
-                      Agendar cita
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="text-destructive focus:text-destructive"
-                      onClick={() => handleDeletePatient(patient.id)}
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Eliminar
-                    </DropdownMenuItem>
+                    <Can permission="edit-patients">
+                      <DropdownMenuItem asChild>
+                        <Link to={`/patients/${patient.id}/edit`}>Editar</Link>
+                      </DropdownMenuItem>
+                    </Can>
+                    <Can permission="create-appointments">
+                      <DropdownMenuItem onClick={() => handleScheduleAppointment(patient)}>
+                        Agendar cita
+                      </DropdownMenuItem>
+                    </Can>
+                    <Can permission="delete-patients">
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={() => handleDeletePatient(patient.id)}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Eliminar
+                      </DropdownMenuItem>
+                    </Can>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -348,14 +363,16 @@ export default function PatientsList() {
                     month: 'short'
                   })}
                 </span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleScheduleAppointment(patient)}
-                >
-                  <Calendar className="h-3.5 w-3.5 mr-1" />
-                  Agendar
-                </Button>
+                <Can permission="create-appointments">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleScheduleAppointment(patient)}
+                  >
+                    <Calendar className="h-3.5 w-3.5 mr-1" />
+                    Agendar
+                  </Button>
+                </Can>
               </div>
             </div>
           );

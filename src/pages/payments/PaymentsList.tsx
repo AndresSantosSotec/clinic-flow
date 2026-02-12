@@ -49,6 +49,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { RegisterPaymentDialog } from '@/components/payments/RegisterPaymentDialog';
+import { Can } from '@/components/auth/Can';
 
 const paymentMethodIcons: Record<string, React.ElementType> = {
   cash: Banknote,
@@ -161,10 +162,12 @@ export default function PaymentsList() {
             Gestión de pagos y transacciones del sistema
           </p>
         </div>
-        <Button className="gap-2" onClick={() => setRegisterDialogOpen(true)}>
-          <Plus className="h-4 w-4" />
-          Registrar pago
-        </Button>
+        <Can permission="create-payments">
+          <Button className="gap-2" onClick={() => setRegisterDialogOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Registrar pago
+          </Button>
+        </Can>
       </div>
 
       {/* Stats Cards */}
@@ -304,15 +307,17 @@ export default function PaymentsList() {
                           {payment.status !== 'cancelled' && (
                             <>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="text-destructive"
-                                onClick={() => {
-                                  setSelectedPayment(payment);
-                                  setVoidDialogOpen(true);
-                                }}
-                              >
-                                Anular pago
-                              </DropdownMenuItem>
+                              <Can permission="delete-payments">
+                                <DropdownMenuItem
+                                  className="text-destructive"
+                                  onClick={() => {
+                                    setSelectedPayment(payment);
+                                    setVoidDialogOpen(true);
+                                  }}
+                                >
+                                  Anular pago
+                                </DropdownMenuItem>
+                              </Can>
                             </>
                           )}
                         </DropdownMenuContent>

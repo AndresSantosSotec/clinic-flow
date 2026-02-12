@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import { useAuth } from '@/hooks/use-auth';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
@@ -30,50 +31,48 @@ interface NavItem {
   label: string;
   icon: React.ElementType;
   href: string;
-  roles?: string[];
+  permission?: string;
   children?: NavItem[];
 }
 
 const navigation: NavItem[] = [
   { label: 'Dashboard', icon: LayoutDashboard, href: '/' },
-  { label: 'Sedes', icon: Building2, href: '/branches', roles: ['admin'] },
-  { 
-    label: 'Usuarios', 
-    icon: Users, 
-    href: '/users', 
-    roles: ['admin'],
+  { label: 'Sedes', icon: Building2, href: '/branches', permission: 'view-branches' },
+  {
+    label: 'Usuarios',
+    icon: Users,
+    href: '/users',
+    permission: 'view-users',
     children: [
       { label: 'Lista de Usuarios', icon: Users, href: '/users' },
-      { label: 'Roles', icon: Shield, href: '/roles' },
-      { label: 'Permisos', icon: Key, href: '/permissions' },
+      { label: 'Roles', icon: Shield, href: '/roles', permission: 'view-roles' },
+      { label: 'Permisos', icon: Key, href: '/permissions', permission: 'view-roles' },
     ]
   },
-  { label: 'Pacientes', icon: UserCircle, href: '/patients' },
-  { label: 'Agenda', icon: Calendar, href: '/appointments' },
-  { label: 'Consultas', icon: Stethoscope, href: '/encounters', roles: ['doctor'] },
-  { label: 'Cobros', icon: CreditCard, href: '/payments' },
-  { label: 'Reportes', icon: BarChart3, href: '/reports' },
-  { label: 'Recordatorios', icon: Bell, href: '/reminders', roles: ['admin'] },
-  { label: 'Configuración', icon: Settings, href: '/settings', roles: ['admin'] },
+  { label: 'Pacientes', icon: UserCircle, href: '/patients', permission: 'view-patients' },
+  { label: 'Agenda', icon: Calendar, href: '/appointments', permission: 'view-appointments' },
+  { label: 'Consultas', icon: Stethoscope, href: '/encounters', permission: 'view-appointments' },
+  { label: 'Cobros', icon: CreditCard, href: '/payments', permission: 'view-payments' },
+  { label: 'Reportes', icon: BarChart3, href: '/reports', permission: 'view-payments' },
+  { label: 'Recordatorios', icon: Bell, href: '/reminders', permission: 'view-branches' },
+  { label: 'Configuración', icon: Settings, href: '/settings', permission: 'view-users' },
 ];
 
 interface SidebarProps {
-  userRole?: string;
   isMobile?: boolean;
 }
 
-export function Sidebar({ userRole = 'admin', isMobile = false }: SidebarProps) {
+export function Sidebar({ isMobile = false }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({});
   const location = useLocation();
+  const { hasPermission, logout } = useAuth();
 
   const filteredNav = navigation.filter(
-    (item) => !item.roles || item.roles.includes(userRole)
+    (item) => !item.permission || hasPermission(item.permission)
   );
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
     window.location.href = '/login';
   };
 

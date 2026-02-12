@@ -32,6 +32,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import UserForm from "./UserForm";
+import { Can } from "@/components/auth/Can";
 
 export default function UsersList() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -139,10 +140,12 @@ export default function UsersList() {
             Gestiona los usuarios del sistema
           </p>
         </div>
-        <Button onClick={openCreateDialog}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nuevo Usuario
-        </Button>
+        <Can permission="create-users">
+          <Button onClick={openCreateDialog}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nuevo Usuario
+          </Button>
+        </Can>
       </div>
 
       <Card>
@@ -212,23 +215,27 @@ export default function UsersList() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            title="Editar"
-                            onClick={() => openEditDialog(user)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            title="Eliminar"
-                            onClick={() => openDeleteDialog(user)}
-                            className="text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <Can permission="edit-users">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="Editar"
+                              onClick={() => openEditDialog(user)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </Can>
+                          <Can permission="delete-users">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="Eliminar"
+                              onClick={() => openDeleteDialog(user)}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </Can>
                         </div>
                       </TableCell>
                     </TableRow>

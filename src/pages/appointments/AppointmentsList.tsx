@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { AppointmentStatus } from '@/types';
+import { Can } from '@/components/auth/Can';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
@@ -153,12 +154,14 @@ export default function AppointmentsList() {
             {filteredAppointments.length} citas para este día
           </p>
         </div>
-        <Button asChild className="gap-2">
-          <Link to="/appointments/new">
-            <Plus className="h-4 w-4" />
-            Nueva cita
-          </Link>
-        </Button>
+        <Can permission="create-appointments">
+          <Button asChild className="gap-2">
+            <Link to="/appointments/new">
+              <Plus className="h-4 w-4" />
+              Nueva cita
+            </Link>
+          </Button>
+        </Can>
       </div>
 
       {/* Date navigation & View toggle */}
@@ -253,25 +256,29 @@ export default function AppointmentsList() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleStatusUpdate(apt.id, 'confirmed')}>
-                            <CheckCircle2 className="mr-2 h-4 w-4" />
-                            Confirmar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleStatusUpdate(apt.id, 'completed')}>
-                            <CheckCircle2 className="mr-2 h-4 w-4 text-green-500" />
-                            Completar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleStatusUpdate(apt.id, 'cancelled')}>
-                            <XCircle className="mr-2 h-4 w-4 text-red-500" />
-                            Cancelar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            onClick={() => handleDeleteAppointment(apt.id)}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Eliminar
-                          </DropdownMenuItem>
+                          <Can permission="edit-appointments">
+                            <DropdownMenuItem onClick={() => handleStatusUpdate(apt.id, 'confirmed')}>
+                              <CheckCircle2 className="mr-2 h-4 w-4" />
+                              Confirmar
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleStatusUpdate(apt.id, 'completed')}>
+                              <CheckCircle2 className="mr-2 h-4 w-4 text-green-500" />
+                              Completar
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleStatusUpdate(apt.id, 'cancelled')}>
+                              <XCircle className="mr-2 h-4 w-4 text-red-500" />
+                              Cancelar
+                            </DropdownMenuItem>
+                          </Can>
+                          <Can permission="delete-appointments">
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => handleDeleteAppointment(apt.id)}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Eliminar
+                            </DropdownMenuItem>
+                          </Can>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>

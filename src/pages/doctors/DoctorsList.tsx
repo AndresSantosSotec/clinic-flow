@@ -23,6 +23,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Can } from '@/components/auth/Can';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
@@ -102,13 +103,15 @@ export default function DoctorsList() {
             {doctors.filter((d: any) => d.is_active).length} médicos activos
           </p>
         </div>
-        <Button asChild className="gap-2">
-          <Link to="/doctors/new">
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">Nuevo médico</span>
-            <span className="sm:hidden">Nuevo</span>
-          </Link>
-        </Button>
+        <Can permission="create-doctors">
+          <Button asChild className="gap-2">
+            <Link to="/doctors/new">
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Nuevo médico</span>
+              <span className="sm:hidden">Nuevo</span>
+            </Link>
+          </Button>
+        </Can>
       </div>
 
       {/* Filters */}
@@ -201,19 +204,25 @@ export default function DoctorsList() {
                         <DropdownMenuItem asChild>
                           <Link to={`/doctors/${doctor.id}`}>Ver perfil</Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem asChild>
-                          <Link to={`/doctors/${doctor.id}/edit`}>Editar</Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem asChild>
-                          <Link to="/appointments/new">Agendar cita</Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onClick={() => handleDeleteDoctor(doctor.id)}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Eliminar
-                        </DropdownMenuItem>
+                        <Can permission="edit-doctors">
+                          <DropdownMenuItem asChild>
+                            <Link to={`/doctors/${doctor.id}/edit`}>Editar</Link>
+                          </DropdownMenuItem>
+                        </Can>
+                        <Can permission="create-appointments">
+                          <DropdownMenuItem asChild>
+                            <Link to="/appointments/new">Agendar cita</Link>
+                          </DropdownMenuItem>
+                        </Can>
+                        <Can permission="delete-doctors">
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={() => handleDeleteDoctor(doctor.id)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Eliminar
+                          </DropdownMenuItem>
+                        </Can>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>

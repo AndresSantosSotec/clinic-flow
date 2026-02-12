@@ -142,10 +142,20 @@ export default function AppointmentForm() {
       navigate('/appointments');
     },
     onError: (error: any) => {
+      const serverError = error.response?.data;
+      let errorMessage = serverError?.message || 'Ocurrió un error al agendar la cita.';
+
+      if (serverError?.errors) {
+        const firstError = Object.values(serverError.errors)[0] as string[];
+        if (firstError?.[0]) {
+          errorMessage = firstError[0];
+        }
+      }
+
       toast({
         variant: 'destructive',
-        title: 'Error',
-        description: error.response?.data?.message || 'Ocurrió un error al agendar la cita.',
+        title: 'Error de validación',
+        description: errorMessage,
       });
     }
   });

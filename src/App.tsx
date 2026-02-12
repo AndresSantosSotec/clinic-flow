@@ -25,15 +25,25 @@ import RemindersList from "@/pages/reminders/RemindersList";
 import UsersList from "@/pages/users/UsersList";
 import RolesList from "@/pages/users/RolesList";
 import PermissionsList from "@/pages/users/PermissionsList";
+import ProfilePage from "@/pages/users/ProfilePage";
+import SettingsPage from "@/pages/settings/SettingsPage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
 
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const token = localStorage.getItem('token');
-  if (!token) {
+import { useAuth } from "@/hooks/use-auth";
+
+const ProtectedRoute = ({ children, permission }: { children: React.ReactNode, permission?: string }) => {
+  const { isAuthenticated, hasPermission } = useAuth();
+
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
+
+  if (permission && !hasPermission(permission)) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   return <>{children}</>;
 };
 
@@ -74,41 +84,44 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
 
             {/* Branches */}
-            <Route path="/branches" element={<BranchesList />} />
-            <Route path="/branches/new" element={<BranchForm />} />
-            <Route path="/branches/:id" element={<BranchForm />} />
+            <Route path="/branches" element={<ProtectedRoute permission="view-branches"><BranchesList /></ProtectedRoute>} />
+            <Route path="/branches/new" element={<ProtectedRoute permission="create-branches"><BranchForm /></ProtectedRoute>} />
+            <Route path="/branches/:id" element={<ProtectedRoute permission="edit-branches"><BranchForm /></ProtectedRoute>} />
 
             {/* Patients */}
-            <Route path="/patients" element={<PatientsList />} />
-            <Route path="/patients/new" element={<PatientForm />} />
-            <Route path="/patients/:id" element={<PatientProfile />} />
-            <Route path="/patients/:id/edit" element={<PatientForm />} />
+            <Route path="/patients" element={<ProtectedRoute permission="view-patients"><PatientsList /></ProtectedRoute>} />
+            <Route path="/patients/new" element={<ProtectedRoute permission="create-patients"><PatientForm /></ProtectedRoute>} />
+            <Route path="/patients/:id" element={<ProtectedRoute permission="view-patients"><PatientProfile /></ProtectedRoute>} />
+            <Route path="/patients/:id/edit" element={<ProtectedRoute permission="edit-patients"><PatientForm /></ProtectedRoute>} />
 
             {/* Appointments */}
-            <Route path="/appointments" element={<AppointmentsList />} />
-            <Route path="/appointments/new" element={<AppointmentForm />} />
+            <Route path="/appointments" element={<ProtectedRoute permission="view-appointments"><AppointmentsList /></ProtectedRoute>} />
+            <Route path="/appointments/new" element={<ProtectedRoute permission="create-appointments"><AppointmentForm /></ProtectedRoute>} />
 
             {/* Doctors */}
-            <Route path="/doctors" element={<DoctorsList />} />
-            <Route path="/doctors/new" element={<DoctorForm />} />
-            <Route path="/doctors/:id" element={<DoctorProfile />} />
-            <Route path="/doctors/:id/edit" element={<DoctorForm />} />
+            <Route path="/doctors" element={<ProtectedRoute permission="view-doctors"><DoctorsList /></ProtectedRoute>} />
+            <Route path="/doctors/new" element={<ProtectedRoute permission="create-doctors"><DoctorForm /></ProtectedRoute>} />
+            <Route path="/doctors/:id" element={<ProtectedRoute permission="view-doctors"><DoctorProfile /></ProtectedRoute>} />
+            <Route path="/doctors/:id/edit" element={<ProtectedRoute permission="edit-doctors"><DoctorForm /></ProtectedRoute>} />
 
             {/* Payments */}
-            <Route path="/payments" element={<PaymentsList />} />
+            <Route path="/payments" element={<ProtectedRoute permission="view-payments"><PaymentsList /></ProtectedRoute>} />
 
             {/* Reminders */}
             <Route path="/reminders" element={<RemindersList />} />
 
             {/* Users, Roles & Permissions */}
-            <Route path="/users" element={<UsersList />} />
-            <Route path="/roles" element={<RolesList />} />
-            <Route path="/permissions" element={<PermissionsList />} />
+            <Route path="/users" element={<ProtectedRoute permission="view-users"><UsersList /></ProtectedRoute>} />
+            <Route path="/roles" element={<ProtectedRoute permission="view-roles"><RolesList /></ProtectedRoute>} />
+            <Route path="/permissions" element={<ProtectedRoute permission="view-roles"><PermissionsList /></ProtectedRoute>} />
+
+            {/* User Account */}
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/settings" element={<SettingsPage />} />
 
             {/* Placeholder routes */}
-            <Route path="/encounters" element={<div className="page-header"><h1 className="page-title">Consultas</h1><p className="text-muted-foreground">Próximamente...</p></div>} />
-            <Route path="/reports" element={<div className="page-header"><h1 className="page-title">Reportes</h1><p className="text-muted-foreground">Próximamente...</p></div>} />
-            <Route path="/settings" element={<div className="page-header"><h1 className="page-title">Configuración</h1><p className="text-muted-foreground">Próximamente...</p></div>} />
+            <Route path="/encounters" element={<div className="p-8 text-center text-muted-foreground">Próximamente: Historial de Consultas Médicas</div>} />
+            <Route path="/reports" element={<div className="p-8 text-center text-muted-foreground">Próximamente: Reportes y Estadísticas</div>} />
           </Route>
 
           {/* 404 */}

@@ -27,6 +27,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Can } from '@/components/auth/Can';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
@@ -96,12 +97,14 @@ export default function BranchesList() {
             Administra las sucursales de la clínica
           </p>
         </div>
-        <Button asChild className="gap-2">
-          <Link to="/branches/new">
-            <Plus className="h-4 w-4" />
-            Nueva sede
-          </Link>
-        </Button>
+        <Can permission="create-branches">
+          <Button asChild className="gap-2">
+            <Link to="/branches/new">
+              <Plus className="h-4 w-4" />
+              Nueva sede
+            </Link>
+          </Button>
+        </Can>
       </div>
 
       {/* Branches grid */}
@@ -128,9 +131,11 @@ export default function BranchesList() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem asChild>
-                      <Link to={`/branches/${branch.id}`}>Editar</Link>
-                    </DropdownMenuItem>
+                    <Can permission="edit-branches">
+                      <DropdownMenuItem asChild>
+                        <Link to={`/branches/${branch.id}`}>Editar</Link>
+                      </DropdownMenuItem>
+                    </Can>
                     <DropdownMenuItem>Ver horarios</DropdownMenuItem>
                     <DropdownMenuItem>Ver usuarios</DropdownMenuItem>
                   </DropdownMenuContent>
@@ -150,10 +155,17 @@ export default function BranchesList() {
                     {branch.is_active ? 'Activa' : 'Inactiva'}
                   </span>
                 </div>
-                <Switch
-                  checked={branch.is_active}
-                  onCheckedChange={() => toggleBranchStatus(branch.id, branch.is_active)}
-                />
+                <Can permission="edit-branches">
+                  <Switch
+                    checked={branch.is_active}
+                    onCheckedChange={() => toggleBranchStatus(branch.id, branch.is_active)}
+                  />
+                </Can>
+                {!branch.is_active && (
+                  <Can permission="edit-branches" fallback={<span className="text-xs text-muted-foreground">Inactiva</span>}>
+                    <div />
+                  </Can>
+                )}
               </div>
 
               {/* Details */}

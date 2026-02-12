@@ -1,4 +1,6 @@
-import { Bell, Search, ChevronDown } from 'lucide-react';
+import { Bell, Search, ChevronDown, User as UserIcon, Settings, LogOut } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -27,12 +29,13 @@ export function Header({
   ],
   onBranchChange
 }: HeaderProps) {
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  if (!user) return null;
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    window.location.href = '/login';
+    logout();
   };
 
   const initials = (user.name || 'Admin')
@@ -42,12 +45,9 @@ export function Header({
     .toUpperCase()
     .slice(0, 2);
 
-  const roleLabels: Record<string, string> = {
-    admin: 'Administrador',
-    reception: 'Recepción',
-    doctor: 'Médico',
-    accounting: 'Contabilidad',
-  };
+  const roleLabel = user.roles && user.roles.length > 0
+    ? user.roles[0].name
+    : 'Usuario';
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-card px-6">
@@ -113,7 +113,7 @@ export function Header({
               <div className="hidden flex-col items-start sm:flex">
                 <span className="text-sm font-medium">{user.name}</span>
                 <Badge variant="secondary" className="h-4 text-[10px] px-1.5">
-                  {roleLabels[user.role] || user.role}
+                  {roleLabel}
                 </Badge>
               </div>
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -122,11 +122,22 @@ export function Header({
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>Mi cuenta</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Perfil</DropdownMenuItem>
-            <DropdownMenuItem>Preferencias</DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to="/profile" className="flex items-center gap-2 cursor-pointer">
+                <UserIcon className="h-4 w-4" />
+                <span>Perfil</span>
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to="/settings" className="flex items-center gap-2 cursor-pointer">
+                <Settings className="h-4 w-4" />
+                <span>Preferencias</span>
+              </Link>
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive" onClick={handleLogout}>
-              Cerrar sesión
+            <DropdownMenuItem className="text-destructive flex items-center gap-2 cursor-pointer" onClick={handleLogout}>
+              <LogOut className="h-4 w-4" />
+              <span>Cerrar sesión</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
