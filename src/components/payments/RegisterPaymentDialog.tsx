@@ -66,8 +66,14 @@ export function RegisterPaymentDialog({ open, onOpenChange }: RegisterPaymentDia
   const { data: appointmentsResponse } = useQuery({
     queryKey: ['appointments', 'pending_payment'],
     queryFn: async () => {
-      // En un caso real podrías filtrar citas completadas sin pago
-      const response = await api.get('/appointments');
+      // Filtrar citas sin pago y obtener un número razonable para el select
+      const response = await api.get('/appointments', {
+        params: {
+          unpaid_only: true,
+          per_page: 100,
+          status: 'completed' // Asumimos que solo se pagan citas completadas, o quitar si se permite prepago
+        }
+      });
       return response.data;
     },
     enabled: open,
@@ -149,20 +155,24 @@ export function RegisterPaymentDialog({ open, onOpenChange }: RegisterPaymentDia
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Selecciona la cita" />
+                        <SelectValue placeholder="Selecciona la cita pendiente" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {appointments.map((apt: any) => (
-                        <SelectItem key={apt.id} value={apt.id.toString()}>
-                          <div className="flex flex-col">
-                            <span className="font-medium">{apt.patient?.first_name} {apt.patient?.last_name}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(apt.appointment_date).toLocaleDateString()} — {apt.doctor?.first_name}
-                            </span>
-                          </div>
-                        </SelectItem>
-                      ))}
+                      {appointments.length === 0 ? (
+                        <SelectItem value="none" disabled>No hay citas pendientes de pago</SelectItem>
+                      ) : (
+                        appointments.map((apt: any) => (
+                          <SelectItem key={apt.id} value={apt.id.toString()}>
+                            <div className="flex flex-col text-left">
+                              <span className="font-medium">{apt.patient?.first_name} {apt.patient?.last_name}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(apt.appointment_date).toLocaleDateString()} — {apt.doctor?.first_name}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -175,7 +185,7 @@ export function RegisterPaymentDialog({ open, onOpenChange }: RegisterPaymentDia
               name="amount"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Monto (MXN)</FormLabel>
+                  <FormLabel>Monto (GTQ)</FormLabel>
                   <FormControl>
                     <div className="relative">
                       <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

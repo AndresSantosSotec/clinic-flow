@@ -18,6 +18,7 @@ import {
   Shield,
   Key,
   ChevronDown,
+  BriefcaseMedical,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -50,12 +51,13 @@ const navigation: NavItem[] = [
     ]
   },
   { label: 'Pacientes', icon: UserCircle, href: '/patients', permission: 'view-patients' },
+  { label: 'Médicos', icon: BriefcaseMedical, href: '/doctors', permission: 'view-doctors' },
   { label: 'Agenda', icon: Calendar, href: '/appointments', permission: 'view-appointments' },
-  { label: 'Consultas', icon: Stethoscope, href: '/encounters', permission: 'view-appointments' },
+  { label: 'Consultas', icon: Stethoscope, href: '/consultations', permission: 'view-appointments' },
   { label: 'Cobros', icon: CreditCard, href: '/payments', permission: 'view-payments' },
   { label: 'Reportes', icon: BarChart3, href: '/reports', permission: 'view-payments' },
   { label: 'Recordatorios', icon: Bell, href: '/reminders', permission: 'view-branches' },
-  { label: 'Configuración', icon: Settings, href: '/settings', permission: 'view-users' },
+  { label: 'Configuración', icon: Settings, href: '/settings' },
 ];
 
 interface SidebarProps {

@@ -34,8 +34,11 @@ import { useToast } from "@/hooks/use-toast";
 import UserForm from "./UserForm";
 import { Can } from "@/components/auth/Can";
 
+import { useSearchParams } from "react-router-dom";
+
 export default function UsersList() {
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchParams] = useSearchParams();
+  const [searchTerm, setSearchTerm] = useState(searchParams.get("search") || "");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<any>(null);
   const [formOpen, setFormOpen] = useState(false);

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Search,
@@ -10,7 +10,12 @@ import {
   Calendar,
   MoreHorizontal,
   Plus,
-  Trash2
+  Trash2,
+  UserCheck,
+  Edit,
+  Eye,
+  Shield,
+  X
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,8 +26,16 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Can } from '@/components/auth/Can';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -31,6 +44,7 @@ import api from '@/lib/api';
 
 export default function DoctorsList() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [specialtyFilter, setSpecialtyFilter] = useState('all');
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -70,11 +84,23 @@ export default function DoctorsList() {
 
   const doctors = data?.data || [];
 
+  // Extract unique specialties for filter
+  const specialties = useMemo(() => {
+    const specs = [...new Set(doctors.map((d: any) => d.specialty))].filter(Boolean).sort();
+    return specs as string[];
+  }, [doctors]);
+
   const filteredDoctors = doctors.filter(
-    (doctor: any) =>
-      `${doctor.first_name} ${doctor.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doctor.specialty.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doctor.email.toLowerCase().includes(searchQuery.toLowerCase())
+    (doctor: any) => {
+      const matchesSearch =
+        `${doctor.first_name} ${doctor.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        doctor.specialty.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        doctor.email.toLowerCase().includes(searchQuery.toLowerCase());
+
+      const matchesSpecialty = specialtyFilter === 'all' || doctor.specialty === specialtyFilter;
+
+      return matchesSearch && matchesSpecialty;
+    }
   );
 
   if (isLoading) {
@@ -100,7 +126,7 @@ export default function DoctorsList() {
         <div className="page-header mb-0">
           <h1 className="page-title">Médicos</h1>
           <p className="page-description">
-            {doctors.filter((d: any) => d.is_active).length} médicos activos
+            {doctors.filter((d: any) => d.is_active).length} médicos activos · {specialties.length} especialidades
           </p>
         </div>
         <Can permission="create-doctors">
@@ -119,17 +145,49 @@ export default function DoctorsList() {
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Buscar por nombre, especialidad..."
+            placeholder="Buscar por nombre, especialidad, correo..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
           />
         </div>
-        <Button variant="outline" className="gap-2">
-          <Filter className="h-4 w-4" />
-          Filtros
-        </Button>
+        <div className="flex gap-2 items-center">
+          <Select value={specialtyFilter} onValueChange={setSpecialtyFilter}>
+            <SelectTrigger className="w-[220px]">
+              <div className="flex items-center gap-2">
+                <Stethoscope className="h-4 w-4 text-muted-foreground" />
+                <SelectValue placeholder="Filtrar especialidad" />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas las especialidades</SelectItem>
+              {specialties.map((spec) => (
+                <SelectItem key={spec} value={spec}>
+                  {spec}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {specialtyFilter !== 'all' && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSpecialtyFilter('all')}
+              className="h-8 w-8"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </div>
+
+      {/* Results count */}
+      {(searchQuery || specialtyFilter !== 'all') && (
+        <p className="text-sm text-muted-foreground">
+          {filteredDoctors.length} resultado{filteredDoctors.length !== 1 ? 's' : ''} encontrado{filteredDoctors.length !== 1 ? 's' : ''}
+          {specialtyFilter !== 'all' && <span> en <Badge variant="secondary" className="ml-1">{specialtyFilter}</Badge></span>}
+        </p>
+      )}
 
       {/* Doctors Grid */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -137,14 +195,21 @@ export default function DoctorsList() {
           const initials = `${doctor.first_name[0]}${doctor.last_name[0]}`.toUpperCase();
 
           return (
-            <Card key={doctor.id} className="hover:shadow-md transition-shadow">
+            <Card key={doctor.id} className="hover:shadow-md transition-shadow group">
               <CardContent className="pt-6">
                 <div className="flex flex-col items-center text-center">
-                  <Avatar className="h-16 w-16 mb-3">
-                    <AvatarFallback className="bg-primary text-primary-foreground text-lg">
-                      {initials}
-                    </AvatarFallback>
-                  </Avatar>
+                  <div className="relative">
+                    <Avatar className="h-16 w-16 mb-3">
+                      <AvatarFallback className="bg-primary text-primary-foreground text-lg">
+                        {initials}
+                      </AvatarFallback>
+                    </Avatar>
+                    {doctor.user && (
+                      <div className="absolute -bottom-1 -right-1 bg-green-500 text-white rounded-full p-0.5" title="Cuenta de usuario vinculada">
+                        <UserCheck className="h-3.5 w-3.5" />
+                      </div>
+                    )}
+                  </div>
 
                   <div className="flex items-center gap-2 mb-1">
                     <Link
@@ -202,18 +267,41 @@ export default function DoctorsList() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem asChild>
-                          <Link to={`/doctors/${doctor.id}`}>Ver perfil</Link>
+                          <Link to={`/doctors/${doctor.id}`}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            Ver perfil
+                          </Link>
                         </DropdownMenuItem>
                         <Can permission="edit-doctors">
                           <DropdownMenuItem asChild>
-                            <Link to={`/doctors/${doctor.id}/edit`}>Editar</Link>
+                            <Link to={`/doctors/${doctor.id}/edit`}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Editar
+                            </Link>
                           </DropdownMenuItem>
                         </Can>
                         <Can permission="create-appointments">
                           <DropdownMenuItem asChild>
-                            <Link to="/appointments/new">Agendar cita</Link>
+                            <Link to="/appointments/new">
+                              <Calendar className="mr-2 h-4 w-4" />
+                              Agendar cita
+                            </Link>
                           </DropdownMenuItem>
                         </Can>
+                        {doctor.user && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <Can permission="view-users">
+                              <DropdownMenuItem asChild>
+                                <Link to={`/users?search=${doctor.email}`}>
+                                  <Shield className="mr-2 h-4 w-4" />
+                                  Gestionar acceso
+                                </Link>
+                              </DropdownMenuItem>
+                            </Can>
+                          </>
+                        )}
+                        <DropdownMenuSeparator />
                         <Can permission="delete-doctors">
                           <DropdownMenuItem
                             className="text-destructive focus:text-destructive"
@@ -232,6 +320,18 @@ export default function DoctorsList() {
           );
         })}
       </div>
+
+      {filteredDoctors.length === 0 && (
+        <div className="py-12 text-center">
+          <Stethoscope className="mx-auto h-12 w-12 text-muted-foreground/30" />
+          <h3 className="mt-4 text-lg font-semibold">No se encontraron médicos</h3>
+          <p className="text-muted-foreground">
+            {searchQuery || specialtyFilter !== 'all'
+              ? 'Intenta cambiar los filtros de búsqueda.'
+              : 'Registra tu primer médico para comenzar.'}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

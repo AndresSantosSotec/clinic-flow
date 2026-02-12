@@ -69,19 +69,30 @@ const paymentMethodLabels: Record<string, string> = {
   insurance: 'Seguro'
 };
 
+
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
+
 export default function PaymentsList() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(1);
   const [registerDialogOpen, setRegisterDialogOpen] = useState(false);
   const [voidDialogOpen, setVoidDialogOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<any>(null);
   const [voidReason, setVoidReason] = useState('');
 
   const { data: paymentsResponse, isLoading, error } = useQuery({
-    queryKey: ['payments'],
+    queryKey: ['payments', page],
     queryFn: async () => {
-      const response = await api.get('/payments');
+      const response = await api.get('/payments', { params: { page } });
       return response.data;
     },
   });
@@ -110,6 +121,7 @@ export default function PaymentsList() {
   });
 
   const payments = paymentsResponse?.data || [];
+  const totalPages = paymentsResponse?.last_page || 1;
 
   const filteredPayments = payments.filter(
     (payment: any) =>
@@ -119,9 +131,9 @@ export default function PaymentsList() {
   );
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-MX', {
+    return new Intl.NumberFormat('es-GT', {
       style: 'currency',
-      currency: 'MXN'
+      currency: 'GTQ'
     }).format(amount);
   };
 
@@ -146,9 +158,11 @@ export default function PaymentsList() {
     );
   }
 
+  // Calculate totals - note: this only calculates for current page unless we implement a backend endpoint for totals
+  // For now we'll format what we have, but ideally backend should provide these stats
   const totals = {
     today: payments.filter((p: any) => p.payment_date?.startsWith(new Date().toISOString().split('T')[0])).reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0),
-    count: payments.length,
+    count: paymentsResponse?.total || payments.length,
     cancelled: payments.filter((p: any) => p.status === 'cancelled').length
   };
 
@@ -180,7 +194,7 @@ export default function PaymentsList() {
               </div>
               <div>
                 <p className="text-xl font-bold">{formatCurrency(totals.today)}</p>
-                <p className="text-xs text-muted-foreground">Ingresos del día</p>
+                <p className="text-xs text-muted-foreground">Ingresos del día (Página actual)</p>
               </div>
             </div>
           </CardContent>
@@ -206,7 +220,7 @@ export default function PaymentsList() {
               </div>
               <div>
                 <p className="text-xl font-bold">{totals.cancelled}</p>
-                <p className="text-xs text-muted-foreground">Anuladas / Canceladas</p>
+                <p className="text-xs text-muted-foreground">Anuladas / Canceladas (Página actual)</p>
               </div>
             </div>
           </CardContent>
@@ -330,6 +344,36 @@ export default function PaymentsList() {
           </TableBody>
         </Table>
       </div>
+
+      {totalPages > 1 && (
+        <Pagination>
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                className={page === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+              />
+            </PaginationItem>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+              <PaginationItem key={p}>
+                <PaginationLink
+                  isActive={page === p}
+                  onClick={() => setPage(p)}
+                  className="cursor-pointer"
+                >
+                  {p}
+                </PaginationLink>
+              </PaginationItem>
+            ))}
+            <PaginationItem>
+              <PaginationNext
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                className={page === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      )}
 
       <RegisterPaymentDialog
         open={registerDialogOpen}
