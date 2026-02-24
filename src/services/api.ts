@@ -515,4 +515,132 @@ export const reminderService = {
   },
 };
 
+// ============================================
+// Documentos Médicos
+// ============================================
+
+import type {
+  PacienteDocumento,
+  FiltrosDocumentos,
+  DocumentosResponse,
+  UrlTemporalResponse,
+} from '@/types/documentos';
+
+export const documentosService = {
+  async listar(pacienteId: number, filtros?: FiltrosDocumentos): Promise<DocumentosResponse> {
+    const params = new URLSearchParams();
+    if (filtros) {
+      Object.entries(filtros).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          params.append(key, String(value));
+        }
+      });
+    }
+    const url = `/pacientes/${pacienteId}/documentos${params.toString() ? `?${params.toString()}` : ''}`;
+    const response = await api.get(url);
+    return response.data;
+  },
+
+  async subir(pacienteId: number, data: {
+    archivos: File[];
+    categoria: string;
+    tipo_documento?: string;
+    descripcion?: string;
+    fecha_documento?: string;
+    consulta_id?: number;
+    cita_id?: number;
+    visible_para_paciente?: boolean;
+    es_confidencial?: boolean;
+  }) {
+    const formData = new FormData();
+    
+    // Agregar archivos
+    data.archivos.forEach((archivo) => {
+      formData.append('archivos[]', archivo);
+    });
+    
+    // Agregar otros campos
+    formData.append('categoria', data.categoria);
+    if (data.tipo_documento) formData.append('tipo_documento', data.tipo_documento);
+    if (data.descripcion) formData.append('descripcion', data.descripcion);
+    if (data.fecha_documento) formData.append('fecha_documento', data.fecha_documento);
+    if (data.consulta_id) formData.append('consulta_id', String(data.consulta_id));
+    if (data.cita_id) formData.append('cita_id', String(data.cita_id));
+    if (data.visible_para_paciente !== undefined) {
+      formData.append('visible_para_paciente', data.visible_para_paciente ? '1' : '0');
+    }
+    if (data.es_confidencial !== undefined) {
+      formData.append('es_confidencial', data.es_confidencial ? '1' : '0');
+    }
+
+    const response = await api.post(`/pacientes/${pacienteId}/documentos`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  async obtenerUrlTemporal(pacienteId: number, documentoId: number): Promise<UrlTemporalResponse> {
+    const response = await api.get(`/pacientes/${pacienteId}/documentos/${documentoId}/url`);
+    return response.data;
+  },
+
+  async descargar(pacienteId: number, documentoId: number) {
+    const response = await api.get(`/pacientes/${pacienteId}/documentos/${documentoId}/descargar`, {
+      responseType: 'blob',
+    });
+    
+    // Obtener nombre del archivo del header
+    const contentDisposition = response.headers['content-disposition'];
+    let filename = 'documento';
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
+      if (filenameMatch) {
+        filename = filenameMatch[1];
+      }
+    }
+    
+    // Crear y descargar archivo
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+    
+    return response.data;
+  },
+
+  async eliminar(pacienteId: number, documentoId: number) {
+    const response = await api.delete(`/pacientes/${pacienteId}/documentos/${documentoId}`);
+    return response.data;
+  },
+
+  async exportarExpediente(pacienteId: number) {
+    const response = await api.get(`/pacientes/${pacienteId}/documentos/exportar`, {
+      responseType: 'blob',
+    });
+    
+    // Crear y descargar ZIP
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `expediente_paciente_${pacienteId}.zip`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+    
+    return response.data;
+  },
+
+  async obtenerDetalles(pacienteId: number, documentoId: number): Promise<PacienteDocumento> {
+    const response = await api.get(`/pacientes/${pacienteId}/documentos/${documentoId}`);
+    return response.data.data;
+  },
+};
+
 export default api;

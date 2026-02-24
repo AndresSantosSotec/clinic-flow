@@ -11,7 +11,8 @@ import {
     History,
     FileText,
     User,
-    Heart
+    Heart,
+    FolderOpen
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -63,6 +64,12 @@ export default function PatientProfile() {
                     <h1 className="text-2xl font-bold">Resumen del Paciente</h1>
                 </div>
                 <div className="flex gap-2">
+                    <Button asChild variant="outline" className="gap-2">
+                        <Link to={`/patients/${id}/expediente`}>
+                            <FolderOpen className="h-4 w-4" />
+                            Expediente
+                        </Link>
+                    </Button>
                     <Button asChild className="gap-2">
                         <Link to={`/appointments/new?patient=${id}`}>
                             <Calendar className="h-4 w-4" />

@@ -16,6 +16,7 @@ import BranchForm from "@/pages/branches/BranchForm";
 import PatientsList from "@/pages/patients/PatientsList";
 import PatientForm from "@/pages/patients/PatientForm";
 import PatientProfile from "@/pages/patients/PatientProfile";
+import ExpedienteDigital from "@/pages/patients/ExpedienteDigital";
 import AppointmentsList from "@/pages/appointments/AppointmentsList";
 import AppointmentForm from "@/pages/appointments/AppointmentForm";
 import DoctorsList from "@/pages/doctors/DoctorsList";
@@ -97,6 +98,7 @@ const App = () => (
               <Route path="/patients/new" element={<ProtectedRoute permission="create-patients"><PatientForm /></ProtectedRoute>} />
               <Route path="/patients/:id" element={<ProtectedRoute permission="view-patients"><PatientProfile /></ProtectedRoute>} />
               <Route path="/patients/:id/edit" element={<ProtectedRoute permission="edit-patients"><PatientForm /></ProtectedRoute>} />
+              <Route path="/patients/:id/expediente" element={<ProtectedRoute permission="view-patients"><ExpedienteDigital /></ProtectedRoute>} />
 
               {/* Appointments */}
               <Route path="/appointments" element={<ProtectedRoute permission="view-appointments"><AppointmentsList /></ProtectedRoute>} />
