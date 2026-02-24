@@ -11,9 +11,9 @@ const api = axios.create({
   },
 });
 
-// Add auth token to requests if available
+// Add auth token to requests if available (same key as LoginPage / lib/api)
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("auth_token");
+  const token = localStorage.getItem("token");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -25,8 +25,9 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Token expired or invalid
-      localStorage.removeItem("auth_token");
+      // Token expired or invalid - use same key as app
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
       window.location.href = "/login";
     }
     return Promise.reject(error);
@@ -41,7 +42,7 @@ export const authService = {
   async login(email: string, password: string) {
     const response = await api.post("/login", { email, password });
     if (response.data.token) {
-      localStorage.setItem("auth_token", response.data.token);
+      localStorage.setItem("token", response.data.token);
     }
     return response.data;
   },
@@ -54,7 +55,7 @@ export const authService = {
   }) {
     const response = await api.post("/register", data);
     if (response.data.token) {
-      localStorage.setItem("auth_token", response.data.token);
+      localStorage.setItem("token", response.data.token);
     }
     return response.data;
   },
@@ -63,12 +64,13 @@ export const authService = {
     try {
       await api.post("/logout");
     } finally {
-      localStorage.removeItem("auth_token");
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
     }
   },
 
   isAuthenticated() {
-    return !!localStorage.getItem("auth_token");
+    return !!localStorage.getItem("token");
   },
 };
 
