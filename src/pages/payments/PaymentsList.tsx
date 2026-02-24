@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Plus,
   Search,
@@ -82,12 +83,23 @@ import {
 export default function PaymentsList() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
   const [registerDialogOpen, setRegisterDialogOpen] = useState(false);
   const [voidDialogOpen, setVoidDialogOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<any>(null);
   const [voidReason, setVoidReason] = useState('');
+
+  // Open register dialog if action=new query param is present
+  useEffect(() => {
+    if (searchParams.get('action') === 'new') {
+      setRegisterDialogOpen(true);
+      // Remove the query param after opening the dialog
+      searchParams.delete('action');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const { data: paymentsResponse, isLoading, error } = useQuery({
     queryKey: ['payments', page],

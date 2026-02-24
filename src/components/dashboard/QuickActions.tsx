@@ -35,14 +35,14 @@ const actions: QuickAction[] = [
     label: 'Nueva consulta',
     description: 'Iniciar consulta médica',
     icon: ClipboardPlus,
-    href: '/encounters/new',
+    href: '/consultations?new=true',
     color: 'bg-info/10 text-info',
   },
   {
     label: 'Registrar pago',
     description: 'Registrar un cobro',
     icon: CreditCard,
-    href: '/payments/new',
+    href: '/payments?action=new',
     color: 'bg-warning/10 text-warning',
   },
 ];

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     FileText,
     Search,
@@ -38,11 +38,27 @@ import {
     PaginationNext,
     PaginationPrevious,
 } from '@/components/ui/pagination';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 export default function ConsultationsList() {
     const [searchQuery, setSearchQuery] = useState('');
     const [page, setPage] = useState(1);
     const [addDialogOpen, setAddDialogOpen] = useState(false);
+    const location = useLocation();
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        if (params.get('new') === 'true') {
+            setAddDialogOpen(true);
+            params.delete('new');
+            const search = params.toString();
+            navigate({
+                pathname: location.pathname,
+                search: search ? `?${search}` : '',
+            }, { replace: true });
+        }
+    }, [location, navigate]);
 
     const { data: consultationsResponse, isLoading, error } = useQuery({
         queryKey: ['consultations', page],
